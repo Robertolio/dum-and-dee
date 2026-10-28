@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+apps/client/test-results/
+apps/client/playwright-report/
+apps/client/e2e-output/
+.vite/
