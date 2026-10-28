@@ -37,6 +37,7 @@ export function createPlayer(x: number, t: Tuning): PlayerState {
     jumpY: 0,
     jumpHeld: false,
     jumpReq: false,
+    bumpCd: 0,
     yHandRaw: yHand(h, t),
     y: yHand(h, t),
     yVel: 0,

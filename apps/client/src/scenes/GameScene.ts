@@ -23,6 +23,7 @@ import { DEE_STYLE, DUM_STYLE, drawFigure } from '../render/figures';
 import { drawLadder } from '../render/ladder';
 import { drawThumb } from '../render/thumbs';
 import { STRINGS } from '../strings';
+import { sfx } from '../audio/sfx';
 import { ReplayRecorder } from '../debug/replay';
 import { isTouchDevice } from '../platform/fullscreen';
 
@@ -50,6 +51,8 @@ export class GameScene extends Phaser.Scene {
   private gProps!: Phaser.GameObjects.Graphics;
   private walk: [WalkAnim, WalkAnim] = [createWalkAnim(0), createWalkAnim(0)];
   private walkAmp: [number, number] = [0, 0];
+  private prevStepIdx: [number, number] = [0, 0];
+  private prevAir: [boolean, boolean] = [false, false];
   private bucketSprite!: Phaser.GameObjects.Image;
   private splash!: Phaser.GameObjects.Particles.ParticleEmitter;
   private sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -230,7 +233,10 @@ export class GameScene extends Phaser.Scene {
       const inputs = this.replay.process(live);
       this.lastInputs = inputs;
       step(this.state, inputs, this.tuning);
-      for (let i = 0; i < 2; i++) this.walkAmp[i] = advanceWalk(this.walk[i]!, this.state.players[i]!.x, h);
+      for (let i = 0; i < 2; i++) {
+        this.walkAmp[i] = advanceWalk(this.walk[i]!, this.state.players[i]!.x, h);
+        this.playMovementSounds(i);
+      }
       this.handleEvents(this.state.events);
       this.accumulator -= h;
       steps++;
@@ -247,19 +253,40 @@ export class GameScene extends Phaser.Scene {
     this.render();
   }
 
+  private playMovementSounds(i: number): void {
+    const p = this.state.players[i]!;
+    const air = p.jumpT > 0;
+    if (air && !this.prevAir[i]!) sfx.jump();
+    if (!air && this.prevAir[i]!) sfx.land();
+    this.prevAir[i] = air;
+    const idx = Math.floor(this.walk[i]!.phase / Math.PI);
+    if (idx !== this.prevStepIdx[i] && !air && this.walkAmp[i]! > 0.25) sfx.footstep(this.walkAmp[i]!);
+    this.prevStepIdx[i] = idx;
+  }
+
   private handleEvents(events: GameEvent[]): void {
     for (const e of events) {
       const sx = e.x !== undefined ? this.view.sx(e.x) : this.scale.width / 2;
       const sy = e.y !== undefined ? this.view.sy(e.y) : FLOOR_Y - 200;
       switch (e.type) {
+        case 'bump':
+          sfx.bump(e.value ?? 1);
+          break;
+        case 'push':
+          sfx.push(e.value ?? 1);
+          break;
         case 'lampHit':
-        case 'lampTick':
+        case 'lampTick': {
+          const near = this.state.lamps.reduce((best, l) => (Math.abs(l.x - (e.x ?? 0)) < Math.abs(best.x - (e.x ?? 0)) ? l : best), this.state.lamps[0]!);
+          sfx.thud(near?.kind === 'meat');
+          sfx.splash(e.value ?? 4);
           this.sparks.explode(e.type === 'lampHit' ? 18 : 8, sx, sy + 30);
           this.splashAt(e.type === 'lampHit' ? 20 : 10);
           this.oof = [0.6, 0.6];
           this.shake = 0.2;
           if (e.type === 'lampHit') this.floatText(sx, sy - 10, STRINGS.oof, '#ffd36b');
           break;
+        }
         case 'lampClean':
           this.floatText(sx, sy, `+${e.value} ${STRINGS.cleanPass}`, '#9cf59c');
           break;
@@ -267,12 +294,16 @@ export class GameScene extends Phaser.Scene {
           this.floatText(sx, this.view.sy((e.y ?? 0) + 0.9), `+${e.value} ${STRINGS.caught}`, '#9cf59c');
           break;
         case 'slip':
+          sfx.slip();
+          sfx.splash(10);
           this.floatText(sx, sy - 70, STRINGS.slip, '#ffd36b');
           this.splashAt(14);
           this.shake = 0.25;
           if (e.player !== undefined) this.oof[e.player] = 0.8;
           break;
         case 'beamHit':
+          sfx.bonk();
+          sfx.splash(e.value ?? 8);
           this.floatText(sx, this.view.sy(e.y ?? 2) + 30, STRINGS.bonk, '#ffd36b');
           this.sparks.explode(12, sx, this.view.sy(e.y ?? 2));
           this.splashAt(10);
@@ -283,19 +314,23 @@ export class GameScene extends Phaser.Scene {
           this.splashAt(8);
           break;
         case 'bucketEmpty':
+          sfx.lifeLost();
           this.floatText(sx, sy - 60, STRINGS.newBucket, '#ffffff');
           this.shake = 0.3;
           break;
         case 'ladderSlipped':
+          sfx.lifeLost();
           this.floatText(this.scale.width / 2, 200, STRINGS.ladderSlipped, '#ff9f96');
           this.oof = [1, 1];
           this.shake = 0.4;
           break;
         case 'gameOver':
+          sfx.gameOver();
           this.showGameOver();
           break;
       }
     }
+    if (this.state.bucket.lossRate > 3) sfx.splash(this.state.bucket.lossRate * 0.6);
     if (this.state.bucket.lossRate > 3) this.splashAt(Math.min(6, Math.round(this.state.bucket.lossRate / 3)));
   }
 

@@ -3,6 +3,7 @@ import { computeGameWidth, GAME_H } from './config';
 import { GameScene } from './scenes/GameScene';
 import { mountDebugPanel } from './debug/panel';
 import { mountStartScreen } from './ui/start';
+import { mountAudioButtons } from './audio/sfx';
 import type { PlayerInput } from '@dd/sim';
 
 const width = computeGameWidth(window.innerWidth, window.innerHeight);
@@ -24,6 +25,7 @@ const game = new Phaser.Game({
   input: {
     activePointers: 4,
   },
+  audio: { noAudio: true },
   scene: [GameScene],
 });
 
@@ -38,6 +40,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
   const scene = game.scene.getScene('game') as GameScene;
   const mount = (): void => {
     mountDebugPanel(scene);
+    mountAudioButtons();
     exposeTestHooks(scene);
     mountStartScreen(scene);
   };

@@ -30,6 +30,7 @@ export interface PlayerState {
   jumpY: number;
   jumpHeld: boolean;
   jumpReq: boolean;
+  bumpCd: number;
   /** Requested hand height above the floor (before arm reach). */
   yHandRaw: number;
   /** Effective hand height (after arm reach and ladder kick). */
@@ -124,6 +125,8 @@ export type GameEventType =
   | 'stepMissed'
   | 'bucketEmpty'
   | 'slip'
+  | 'bump'
+  | 'push'
   | 'beamHit'
   | 'ladderSlipped'
   | 'gameOver';

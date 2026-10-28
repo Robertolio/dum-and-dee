@@ -50,3 +50,7 @@ Measured with the headless simulation (`packages/sim`), 60 Hz, default tuning (`
 - Props slide a little when pushed (mass-based, `pushFriction`), the pair stops via the ladder coupling. Banana: slip unless feet are above 0.12 we under the peel (slow, splash, ladder jolt).
 - Stairs 3–5 risers with a ceiling beam above the plateau (`yBottom` = top + 1.5 we): upright ladder bonks, water loss and rebound.
 - Fix: water in the bucket was an unrotated rectangle; it is now drawn in the bucket frame with a level surface.
+
+## Audio
+
+All sound is WebAudio synthesis (`apps/client/src/audio/sfx.ts`), no assets. The AudioContext is created/resumed on the first tap or key (start button); Phaser's own audio is disabled. Sound and music toggles (bottom right) are stored in `localStorage` key `dd-audio`; master gain 0.6 into a compressor, SFX bus 0.5, music bus 0.07.

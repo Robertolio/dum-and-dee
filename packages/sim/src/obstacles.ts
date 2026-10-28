@@ -14,6 +14,7 @@ export function blocksPlayer(p: PlayerState, o: StepObstacle, t: Tuning): boolea
 
 /** Jump arc: smooth sin² bump, started by a rising-edge request while on the ground. */
 export function integrateJump(p: PlayerState, t: Tuning): void {
+  if (p.bumpCd > 0) p.bumpCd = Math.max(0, p.bumpCd - t.dt);
   if (p.jumpT === 0 && p.jumpReq && p.slipTimer <= 0) p.jumpT = t.dt;
   else if (p.jumpT > 0) p.jumpT += t.dt;
   if (p.jumpT >= t.jumpTime) {
@@ -56,9 +57,16 @@ export function resolveObstacles(s: GameState, t: Tuning): void {
       else if (p.x > o.x1 && p.x - fh < o.x1) side = -1;
       if (side === 0) continue;
       const into = p.v * side;
+      if (into > 0.6 && p.bumpCd <= 0) {
+        p.bumpCd = 0.35;
+        s.events.push({ tick: s.tick, type: 'bump', value: into, x: side > 0 ? o.x0 : o.x1, y: o.hObj });
+      }
       if (into > 0 && o.slid < maxSlide(o)) {
         const k = 1 / (1 + 2 * o.mass);
-        if (o.vx * side < into * k) o.vx = side * into * k;
+        if (o.vx * side < into * k) {
+          if (o.vx === 0 && into * k > 0.15) s.events.push({ tick: s.tick, type: 'push', value: o.mass, x: o.x0, y: 0 });
+          o.vx = side * into * k;
+        }
       }
       p.x = side > 0 ? o.x0 - fh : o.x1 + fh;
       if (into > 0 || o.vx * side > 0) p.v = o.vx * side > 0 ? o.vx : 0;
