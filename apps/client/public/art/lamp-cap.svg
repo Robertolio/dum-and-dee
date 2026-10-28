@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="60" viewBox="0 0 80 60">
+  <!-- cap hangs from top centre (40,0); bulb at the bottom -->
+  <rect x="36" y="0" width="8" height="12" fill="#1a1d21"/>
+  <path d="M40 10 L8 44 Q40 54 72 44 Z" fill="#2d3238" stroke="#111417" stroke-width="3" stroke-linejoin="round"/>
+  <ellipse cx="40" cy="46" rx="22" ry="7" fill="#f6d77a" stroke="#111417" stroke-width="2"/>
+  <ellipse cx="40" cy="48" rx="12" ry="5" fill="#fff4c9"/>
+</svg>
