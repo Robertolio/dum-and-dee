@@ -8,7 +8,7 @@ import { integrateHorizontal, integrateVertical, resetPlayerRow, yHand } from '.
 import { evaluateStepCatch, integrateStepUps, updateStepTargets } from './stepup';
 import { integrateBucket, primeBucket } from './bucket';
 import { integrateLamps } from './lamp';
-import { buildLamps, buildSteps, PROTOTYPE_LEVEL, type LevelData } from './level';
+import { buildLamps, buildSteps, createGen, ENDLESS_LEVEL, extendLevel, type LevelData } from './level';
 
 export function createPlayer(x: number, t: Tuning): PlayerState {
   const h = t.hUpright;
@@ -38,7 +38,7 @@ export function createPlayer(x: number, t: Tuning): PlayerState {
   };
 }
 
-export function createState(level: LevelData = PROTOTYPE_LEVEL, t: Tuning = DEFAULT_TUNING, startX = 2): GameState {
+export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAULT_TUNING, startX = 2): GameState {
   const a = createPlayer(startX, t);
   const b = createPlayer(startX + t.L0, t);
   const s: GameState = {
@@ -74,6 +74,7 @@ export function createState(level: LevelData = PROTOTYPE_LEVEL, t: Tuning = DEFA
     },
     lamps: buildLamps(level, t),
     steps: buildSteps(level),
+    gen: null,
     balance: 0,
     balanceTimer: 0,
     score: 0,
@@ -82,6 +83,8 @@ export function createState(level: LevelData = PROTOTYPE_LEVEL, t: Tuning = DEFA
     gameOver: false,
     events: [],
   };
+  s.gen = createGen(level, s.lamps.length, s.steps.length);
+  extendLevel(s, startX, t);
   primeBucket(s);
   return s;
 }
@@ -164,6 +167,7 @@ export function step(s: GameState, inputs: readonly [PlayerInput, PlayerInput], 
     p.push = inp.push;
   }
 
+  extendLevel(s, (s.players[0].x + s.players[1].x) / 2, t);
   updateStepTargets(s, t);
   integrateStepUps(s, t);
   for (const p of s.players) integratePosture(p, t);

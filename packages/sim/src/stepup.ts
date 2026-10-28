@@ -52,6 +52,8 @@ export function evaluateStepCatch(s: GameState, t: Tuning): void {
     const settled = Math.abs(p.yFloor - p.yFloorTarget) < 0.02 && Math.abs(p.yFloorVel) < 0.15;
     if (p.stepTime > 0.15 && settled) {
       p.stepping = false;
+      // Small risers (stairs) are just walked; only real obstacles score or cost.
+      if (p.stepSize < 0.249) continue;
       const caught = p.stepHandDev < t.catchTolerance * p.stepSize;
       if (caught) {
         s.score += t.scoreStepCaught;

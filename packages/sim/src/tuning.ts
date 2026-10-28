@@ -113,6 +113,15 @@ export interface Tuning {
   /** Fraction of the normal impulse converted to lamp swing even for a straight-up hit. */
   lampSwingBias: number;
 
+  // --- Hanging meat (big swinging pendulum, same collision as the lamp) ---
+  meatL: number;
+  meatR: number;
+  meatM: number;
+  meatD: number;
+  /** Swing amplitude range (rad) of a freshly generated piece. */
+  meatAmpMin: number;
+  meatAmpMax: number;
+
   // --- Scoring ---
   scoreDistance: number;
   scoreLampClean: number;
@@ -155,8 +164,8 @@ export const DEFAULT_TUNING: Tuning = {
   balanceFailTime: 0.6,
   balanceRest: 0.35,
 
-  ladderLength: 5.4,
-  ladderOverhang: 0.6,
+  ladderLength: 6.6, // L0 + 2 × overhang
+  ladderOverhang: 1.2, // playtest: ladder sticks out much further over the shoulders
   ladderThickness: 0.15,
   mLadder: 1,
 
@@ -188,6 +197,13 @@ export const DEFAULT_TUNING: Tuning = {
   lampMinRelVel: 1.0,
   lampTickMinVel: 0.6,
   lampSwingBias: 0.6,
+
+  meatL: 1.0,
+  meatR: 0.5,
+  meatM: 1.2,
+  meatD: 0.03,
+  meatAmpMin: 0.35,
+  meatAmpMax: 0.65,
 
   scoreDistance: 1,
   scoreLampClean: 100,

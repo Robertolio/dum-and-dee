@@ -5,7 +5,10 @@ import {
   DEFAULT_TUNING,
   lampCapCenter,
   ladderHeightAt,
-  PROTOTYPE_LEVEL,
+  ENDLESS_LEVEL,
+  advanceWalk,
+  createWalkAnim,
+  type WalkAnim,
   step,
   type GameEvent,
   type GameState,
@@ -42,8 +45,11 @@ export class GameScene extends Phaser.Scene {
   private gFx!: Phaser.GameObjects.Graphics;
   private gThumbs!: Phaser.GameObjects.Graphics;
   private layers: { wall: Phaser.GameObjects.TileSprite; pipes: Phaser.GameObjects.TileSprite; floor: Phaser.GameObjects.TileSprite; ceiling: Phaser.GameObjects.TileSprite } | null = null;
-  private stepSprites: Phaser.GameObjects.Image[] = [];
-  private lampCaps: Phaser.GameObjects.Image[] = [];
+  private stepSprites = new Map<number, Phaser.GameObjects.Image>();
+  private lampSprites = new Map<number, Phaser.GameObjects.Image>();
+  private gProps!: Phaser.GameObjects.Graphics;
+  private walk: [WalkAnim, WalkAnim] = [createWalkAnim(0), createWalkAnim(0)];
+  private walkAmp: [number, number] = [0, 0];
   private bucketSprite!: Phaser.GameObjects.Image;
   private splash!: Phaser.GameObjects.Particles.ParticleEmitter;
   private sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -66,6 +72,12 @@ export class GameScene extends Phaser.Scene {
     this.load.svg('crate', 'art/crate.svg', { width: 100, height: 50 });
     this.load.svg('bracket', 'art/bracket.svg', { width: 80, height: 30 });
     this.load.svg('pallet', 'art/pallet.svg', { width: 120, height: 60 });
+    this.load.svg('banana', 'art/banana.svg', { width: 90, height: 25 });
+    this.load.svg('duck', 'art/duck.svg', { width: 80, height: 40 });
+    this.load.svg('pail', 'art/pail.svg', { width: 80, height: 45 });
+    this.load.svg('tyre', 'art/tyre.svg', { width: 100, height: 40 });
+    this.load.svg('cheese', 'art/cheese.svg', { width: 100, height: 30 });
+    this.load.svg('meat', 'art/meat.svg', { width: 100, height: 120 });
     this.load.svg('lamp-cap', 'art/lamp-cap.svg', { width: 80, height: 60 });
     this.load.svg('bucket', 'art/bucket.svg', { width: 48, height: 52 });
   }
@@ -73,7 +85,8 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     const W = this.scale.width;
     this.view.width = W;
-    this.state = createState(PROTOTYPE_LEVEL, this.tuning);
+    this.state = createState(ENDLESS_LEVEL, this.tuning);
+    this.resetWalk();
 
     // Background layers (parallax tile sprites).
     const wall = this.add.tileSprite(0, FLOOR_Y - 400, W, 400, 'wall').setOrigin(0, 0).setDepth(0);
@@ -82,16 +95,7 @@ export class GameScene extends Phaser.Scene {
     const ceiling = this.add.tileSprite(0, 0, W, 48, 'ceiling').setOrigin(0, 0).setDepth(2);
     this.layers = { wall, pipes, floor, ceiling };
 
-    // Props.
-    for (const o of this.state.steps) {
-      const img = this.add.image(0, 0, o.kind).setOrigin(0, 1).setDepth(6);
-      img.setDisplaySize((o.x1 - o.x0) * PX, o.hObj * PX);
-      this.stepSprites.push(img);
-    }
-    for (const _l of this.state.lamps) {
-      const cap = this.add.image(0, 0, 'lamp-cap').setOrigin(0.5, 0).setDepth(12);
-      this.lampCaps.push(cap);
-    }
+    this.gProps = this.add.graphics().setDepth(6);
     this.bucketSprite = this.add.image(0, 0, 'bucket').setOrigin(0.5, 0.04).setDepth(11);
 
     this.gWorld = this.add.graphics().setDepth(10);
@@ -157,9 +161,14 @@ export class GameScene extends Phaser.Scene {
     this.updateCameraLayers();
   }
 
+  private resetWalk(): void {
+    this.walk = [createWalkAnim(this.state.players[0].x), createWalkAnim(this.state.players[1].x)];
+  }
+
   /** Reset the run; keeps the current tuning and control settings. */
   reset(): void {
-    this.state = createState(PROTOTYPE_LEVEL, this.tuning);
+    this.state = createState(ENDLESS_LEVEL, this.tuning);
+    this.resetWalk();
     this.accumulator = 0;
     this.oof = [0, 0];
     this.overlay?.destroy();
@@ -221,6 +230,7 @@ export class GameScene extends Phaser.Scene {
       const inputs = this.replay.process(live);
       this.lastInputs = inputs;
       step(this.state, inputs, this.tuning);
+      for (let i = 0; i < 2; i++) this.walkAmp[i] = advanceWalk(this.walk[i]!, this.state.players[i]!.x, h);
       this.handleEvents(this.state.events);
       this.accumulator -= h;
       steps++;
@@ -300,6 +310,43 @@ export class GameScene extends Phaser.Scene {
     this.overlay = this.add.container(0, 0, [bg, title, score, hint]).setDepth(80);
   }
 
+  /** Floor props: sprites for objects, plain blocks for stair treads. Created and destroyed as the level scrolls. */
+  private syncProps(): void {
+    const view = this.view;
+    const gp = this.gProps;
+    gp.clear();
+    const live = new Set<number>();
+    for (const o of this.state.steps) {
+      const x0 = view.sx(o.x0);
+      const x1 = view.sx(o.x1);
+      if (x1 < -120 || x0 > this.scale.width + 120) continue;
+      if (o.kind === 'stair') {
+        const top = FLOOR_Y + 2 - o.hObj * PX;
+        gp.fillStyle(0x6f7c86);
+        gp.fillRect(x0, top, x1 - x0, o.hObj * PX);
+        gp.fillStyle(0xaab6bf);
+        gp.fillRect(x0, top, x1 - x0, 6);
+        gp.lineStyle(2, 0x3c474f);
+        gp.strokeRect(x0, top, x1 - x0, o.hObj * PX);
+        continue;
+      }
+      live.add(o.id);
+      let img = this.stepSprites.get(o.id);
+      if (!img) {
+        img = this.add.image(0, 0, o.kind).setOrigin(0, 1).setDepth(6);
+        img.setDisplaySize((o.x1 - o.x0) * PX, o.hObj * PX);
+        this.stepSprites.set(o.id, img);
+      }
+      img.setPosition(x0, FLOOR_Y + 2);
+    }
+    for (const [id, img] of this.stepSprites) {
+      if (!live.has(id)) {
+        img.destroy();
+        this.stepSprites.delete(id);
+      }
+    }
+  }
+
   private updateCameraLayers(): void {
     if (!this.layers) return;
     const cam = this.view.camX * PX;
@@ -319,48 +366,57 @@ export class GameScene extends Phaser.Scene {
 
     this.updateCameraLayers();
 
-    // Step-up props.
-    s.steps.forEach((o, i) => {
-      const img = this.stepSprites[i]!;
-      img.setPosition(view.sx(o.x0), FLOOR_Y + 2);
-    });
-
+    this.syncProps();
     g.clear();
 
-    // Lamps: cord, cap, light cone coloured by ladder clearance.
-    s.lamps.forEach((l, i) => {
+    // Hanging pendulums (lamps and meat): cord, body, light cone for lamps.
+    const live = new Set<number>();
+    for (const l of s.lamps) {
+      live.add(l.id);
       const cap = lampCapCenter(l, t);
       const px = view.sx(l.x);
       const py = view.sy(l.pivotY);
       const cx = view.sx(cap.x);
       const cy = view.sy(cap.y);
-      // cord from the ceiling to the top of the cap
-      const topX = cx - Math.sin(l.psi) * t.lampR * PX;
-      const topY = cy - Math.cos(l.psi) * t.lampR * PX;
-      g.lineStyle(4, COLORS.cord);
+      const topX = cx - Math.sin(l.psi) * l.radius * PX;
+      const topY = cy - Math.cos(l.psi) * l.radius * PX;
+      const meat = l.kind === 'meat';
+      g.lineStyle(meat ? 5 : 4, COLORS.cord);
+      g.lineBetween(px, 48, px, py);
       g.lineBetween(px, py, topX, topY);
       g.fillStyle(COLORS.cord);
       g.fillCircle(px, py, 6);
-      const capImg = this.lampCaps[i]!;
-      capImg.setPosition(topX, topY).setRotation(-l.psi);
-      // light cone on the floor: green when the ladder below is clear, orange when it will hit
-      const clearance = ladderHeightAt(s, l.x) + t.ladderThickness / 2 < cap.y - t.lampR;
+      let img = this.lampSprites.get(l.id);
+      if (!img) {
+        img = this.add.image(0, 0, meat ? 'meat' : 'lamp-cap').setOrigin(0.5, 0).setDepth(12);
+        if (meat) img.setDisplaySize(l.radius * 2 * PX * 1.05, l.radius * 2 * PX * 1.2);
+        this.lampSprites.set(l.id, img);
+      }
+      img.setPosition(topX, topY).setRotation(-l.psi);
+      if (meat) continue;
+      const clearance = ladderHeightAt(s, l.x) + t.ladderThickness / 2 < cap.y - l.radius;
       const near = Math.abs(l.x - (s.players[0].x + s.players[1].x) / 2) < 6;
       const color = !near ? 0xfff0b0 : clearance ? COLORS.balanceGreen : COLORS.balanceOrange;
       g.fillStyle(color, 0.16);
       g.beginPath();
-      g.moveTo(cx - 18, cy + t.lampR * PX - 8);
-      g.lineTo(cx + 18, cy + t.lampR * PX - 8);
+      g.moveTo(cx - 18, cy + l.radius * PX - 8);
+      g.lineTo(cx + 18, cy + l.radius * PX - 8);
       g.lineTo(cx + 110, FLOOR_Y);
       g.lineTo(cx - 110, FLOOR_Y);
       g.closePath();
       g.fillPath();
-    });
+    }
+    for (const [id, img] of this.lampSprites) {
+      if (!live.has(id)) {
+        img.destroy();
+        this.lampSprites.delete(id);
+      }
+    }
 
     // Figures.
     const [a, b] = s.players;
-    drawFigure(g, view, DUM_STYLE, a.x, a.yFloor, a.y, this.oof[0]!);
-    drawFigure(g, view, DEE_STYLE, b.x, b.yFloor, b.y, this.oof[1]!);
+    drawFigure(g, view, DUM_STYLE, a.x, a.yFloor, a.y, this.oof[0]!, this.walk[0]!.phase, this.walkAmp[0]!);
+    drawFigure(g, view, DEE_STYLE, b.x, b.yFloor, b.y, this.oof[1]!, this.walk[1]!.phase, this.walkAmp[1]!);
 
     // Ladder.
     drawLadder(g, view, s, t);

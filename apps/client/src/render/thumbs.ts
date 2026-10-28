@@ -9,14 +9,16 @@ export function drawThumb(g: Phaser.GameObjects.Graphics, th: ThumbState, color:
   const push = th.input.push;
   const h = th.input.hTarget;
 
-  // Ring at the touch-down point.
-  g.lineStyle(3, 0xffffff, 0.35);
-  g.strokeCircle(startX, startY, 46);
-  const frac = Phaser.Math.Clamp((push + 0.3) / 1.3, 0, 1);
-  g.lineStyle(7, color, 0.9);
-  g.beginPath();
-  g.arc(startX, startY, 46, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2, false);
-  g.strokePath();
+  // Ring at the touch-down point (digital only: analog control shows just the posture bar).
+  if (!analog) {
+    g.lineStyle(3, 0xffffff, 0.35);
+    g.strokeCircle(startX, startY, 46);
+    const frac = Phaser.Math.Clamp((push + 0.3) / 1.3, 0, 1);
+    g.lineStyle(7, color, 0.9);
+    g.beginPath();
+    g.arc(startX, startY, 46, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2, false);
+    g.strokePath();
+  }
 
   // Posture bar to the side of the ring.
   const bx = startX + 70;
@@ -37,6 +39,7 @@ export function drawThumb(g: Phaser.GameObjects.Graphics, th: ThumbState, color:
     g.fillRect(bx - 12, top + height * (1 - 0.2) - 1, 24, 2);
   }
 
+  if (analog) return;
   // Current thumb position.
   g.fillStyle(color, 0.35);
   g.fillCircle(x, y, 26);

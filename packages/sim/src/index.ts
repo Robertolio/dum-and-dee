@@ -7,3 +7,5 @@ export * from './math';
 export { yHand, ladderSegment, ladderHeightAt } from './ladder';
 export { lampCapCenter } from './lamp';
 export { closestOnSegment, segmentCircleOverlap } from './collision';
+export * from './walk';
+export { extendLevel } from './level';

@@ -1,29 +1,63 @@
-import type { LampState, StepObstacle, StepKind } from './state';
+import type { GenState, LampKind, LampState, StepObstacle, StepKind } from './state';
 import type { Tuning } from './tuning';
 
 export interface LevelLamp {
   x: number;
+  kind?: LampKind;
+  /** Initial swing angle (rad) and angular velocity. */
+  psi?: number;
+  psiDot?: number;
 }
 export interface LevelStep {
   x: number;
   width: number;
   kind: StepKind;
+  /** Overrides the default height of the kind (stairs). */
+  height?: number;
+}
+export interface LevelGenerator {
+  seed: number;
+  /** x of the first generated pattern. */
+  startX: number;
 }
 export interface LevelData {
   id: string;
   lamps: LevelLamp[];
   steps: LevelStep[];
-  /** Length of the hall in we (decorative in phase 1). */
+  /** Length of the hall in we (decorative). */
   length: number;
+  /** Endless procedural generation ahead of the ladder. */
+  generator?: LevelGenerator;
 }
 
 export const STEP_HEIGHT: Record<StepKind, number> = {
   bracket: 0.3,
   crate: 0.5,
   pallet: 0.6,
+  banana: 0.25,
+  duck: 0.4,
+  pail: 0.45,
+  tyre: 0.4,
+  cheese: 0.3,
+  stair: 0.2,
 };
 
-/** Phase 1 test level: lamps and step-ups in a simple repeating rhythm. */
+/** Default footprint width (we) of each kind, used by the generator and the renderer. */
+export const STEP_WIDTH: Record<StepKind, number> = {
+  bracket: 0.8,
+  crate: 1.0,
+  pallet: 1.2,
+  banana: 0.9,
+  duck: 0.8,
+  pail: 0.8,
+  tyre: 1.0,
+  cheese: 1.0,
+  stair: 0.7,
+};
+
+const FLOOR_KINDS: StepKind[] = ['bracket', 'crate', 'pallet', 'banana', 'duck', 'pail', 'tyre', 'cheese'];
+
+/** Fixed test level (no generator). */
 export const PROTOTYPE_LEVEL: LevelData = {
   id: 'proto-factory',
   length: 140,
@@ -32,24 +66,44 @@ export const PROTOTYPE_LEVEL: LevelData = {
     { x: 24, width: 1.0, kind: 'crate' },
     { x: 45, width: 0.8, kind: 'bracket' },
     { x: 66, width: 1.0, kind: 'crate' },
-    { x: 76.5, width: 1.0, kind: 'crate' }, // crate right before a lamp: step up and bend deeper
+    { x: 76.5, width: 1.0, kind: 'crate' },
     { x: 90, width: 1.2, kind: 'pallet' },
     { x: 111, width: 0.8, kind: 'bracket' },
   ],
 };
 
-export function buildLamps(level: LevelData, t: Tuning): LampState[] {
-  const pivotY = t.lampCapBottomRest + t.lampR + t.lampL;
-  return level.lamps.map((l, i) => ({
-    id: i,
-    x: l.x,
-    pivotY,
-    psi: 0,
-    psiDot: 0,
+/** The real game: endless, procedurally generated with rising difficulty. */
+export const ENDLESS_LEVEL: LevelData = {
+  id: 'endless',
+  length: 1e9,
+  lamps: [],
+  steps: [],
+  generator: { seed: 20241028, startX: 16 },
+};
+
+export function makeLamp(id: number, x: number, kind: LampKind, t: Tuning, psi = 0, psiDot = 0): LampState {
+  const meat = kind === 'meat';
+  const len = meat ? t.meatL : t.lampL;
+  const radius = meat ? t.meatR : t.lampR;
+  return {
+    id,
+    kind,
+    len,
+    radius,
+    damp: meat ? t.meatD : t.lampD,
+    mass: meat ? t.meatM : t.lampM,
+    x,
+    pivotY: t.lampCapBottomRest + t.lampR + t.lampL,
+    psi,
+    psiDot,
     cooldown: 0,
     hits: 0,
     passed: false,
-  }));
+  };
+}
+
+export function buildLamps(level: LevelData, t: Tuning): LampState[] {
+  return level.lamps.map((l, i) => makeLamp(i, l.x, l.kind ?? 'lamp', t, l.psi ?? 0, l.psiDot ?? 0));
 }
 
 export function buildSteps(level: LevelData): StepObstacle[] {
@@ -57,7 +111,146 @@ export function buildSteps(level: LevelData): StepObstacle[] {
     id: i,
     x0: s.x,
     x1: s.x + s.width,
-    hObj: STEP_HEIGHT[s.kind],
+    hObj: s.height ?? STEP_HEIGHT[s.kind],
     kind: s.kind,
   }));
+}
+
+// --- Procedural generation -------------------------------------------------
+
+export function createGen(level: LevelData, existingLamps: number, existingSteps: number): GenState | null {
+  if (!level.generator) return null;
+  return {
+    rng: level.generator.seed >>> 0,
+    nextX: level.generator.startX,
+    nextLampId: existingLamps,
+    nextStepId: existingSteps,
+    patterns: 0,
+  };
+}
+
+function rand(g: GenState): number {
+  // mulberry32
+  g.rng = (g.rng + 0x6d2b79f5) >>> 0;
+  let t = g.rng;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+const lerp = (a: number, b: number, u: number): number => a + (b - a) * u;
+const pick = <T>(g: GenState, arr: readonly T[]): T => arr[Math.floor(rand(g) * arr.length) % arr.length]!;
+
+/** Difficulty 0…1, rising with distance. */
+export function difficultyAt(x: number): number {
+  return Math.min(1, Math.max(0, (x - 20) / 320));
+}
+
+function addStep(s: { steps: StepObstacle[] }, g: GenState, x: number, kind: StepKind, height?: number, width?: number): void {
+  s.steps.push({ id: g.nextStepId++, x0: x, x1: x + (width ?? STEP_WIDTH[kind]), hObj: height ?? STEP_HEIGHT[kind], kind });
+}
+
+function addLamp(s: { lamps: LampState[] }, g: GenState, t: Tuning, x: number, kind: LampKind, psi = 0, psiDot = 0): void {
+  s.lamps.push(makeLamp(g.nextLampId++, x, kind, t, psi, psiDot));
+}
+
+/** Pendulum starting at phase `phase` of a swing with amplitude `amp`. */
+function swingState(amp: number, phase: number, len: number, t: Tuning): [number, number] {
+  const w = Math.sqrt(t.g / len);
+  return [amp * Math.cos(phase), -amp * w * Math.sin(phase)];
+}
+
+function addMeatSeries(s: { lamps: LampState[] }, g: GenState, t: Tuning, x: number, d: number): number {
+  const n = 2 + Math.floor(rand(g) * (1 + d * 3)) + (d > 0.5 ? 1 : 0);
+  const spacing = lerp(2.7, 2.15, d) + rand(g) * 0.3;
+  const amp = lerp(t.meatAmpMin, t.meatAmpMax, rand(g) * 0.5 + d * 0.5);
+  const dphase = pick(g, [0, Math.PI, Math.PI / 2, 0.7, 1.6]);
+  const phase0 = rand(g) * Math.PI * 2;
+  for (let i = 0; i < n; i++) {
+    const [psi, psiDot] = swingState(amp, phase0 + i * dphase, t.meatL, t);
+    addLamp(s, g, t, x + i * spacing, 'meat', psi, psiDot);
+  }
+  return (n - 1) * spacing + 1;
+}
+
+function addStairs(s: { steps: StepObstacle[] }, g: GenState, x: number, d: number): number {
+  const n = 2 + Math.floor(rand(g) * 3); // 2…4 risers
+  const rise = 0.2;
+  const w = STEP_WIDTH.stair;
+  const top = 1.2 + rand(g) * (1 + d);
+  let cx = x;
+  for (let i = 1; i <= n; i++) {
+    addStep(s, g, cx, 'stair', rise * i, w);
+    cx += w;
+  }
+  addStep(s, g, cx, 'stair', rise * n, top);
+  cx += top;
+  for (let i = n - 1; i >= 1; i--) {
+    addStep(s, g, cx, 'stair', rise * i, w);
+    cx += w;
+  }
+  return cx - x;
+}
+
+/** Emit one obstacle pattern at g.nextX and return its length. */
+function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[] }, g: GenState, t: Tuning): number {
+  const x = g.nextX;
+  const d = difficultyAt(x);
+  const r = rand(g);
+  g.patterns += 1;
+  // The first few patterns are gentle: single obstacles.
+  if (g.patterns <= 2) {
+    if (g.patterns === 1) addLamp(s, g, t, x, 'lamp');
+    else addStep(s, g, x, pick(g, ['crate', 'banana', 'duck', 'pail'] as const));
+    return 1;
+  }
+  if (r < 0.26) {
+    addStep(s, g, x, pick(g, FLOOR_KINDS));
+    return 1.2;
+  }
+  if (r < 0.42) {
+    addLamp(s, g, t, x, 'lamp');
+    return 1;
+  }
+  if (r < 0.6) {
+    return addMeatSeries(s, g, t, x, d);
+  }
+  if (r < 0.72) {
+    return addStairs(s, g, x, d);
+  }
+  if (r < 0.84) {
+    // Floor object right before a lamp or meat: step up and bend deeper.
+    addStep(s, g, x, pick(g, FLOOR_KINDS));
+    const gap = lerp(7, 5.5, d) + rand(g);
+    if (rand(g) < 0.5 + d * 0.3) {
+      const [psi, psiDot] = swingState(lerp(t.meatAmpMin, t.meatAmpMax, rand(g)), rand(g) * 6.28, t.meatL, t);
+      addLamp(s, g, t, x + gap, 'meat', psi, psiDot);
+    } else addLamp(s, g, t, x + gap, 'lamp');
+    return gap + 1.2;
+  }
+  // Cluster of 2–3 floor objects with room to settle in between.
+  const n = 2 + (rand(g) < d ? 1 : 0);
+  const spacing = lerp(4.2, 3.2, d);
+  let prev: StepKind | null = null;
+  for (let i = 0; i < n; i++) {
+    let k = pick(g, FLOOR_KINDS);
+    if (k === prev) k = pick(g, FLOOR_KINDS);
+    addStep(s, g, x + i * spacing, k);
+    prev = k;
+  }
+  return (n - 1) * spacing + 1.2;
+}
+
+/** Keep generating until `horizon` we ahead of the ladder; drop obstacles far behind it. */
+export function extendLevel(s: { gen: GenState | null; steps: StepObstacle[]; lamps: LampState[] }, ladderX: number, t: Tuning, horizon = 36): void {
+  const g = s.gen;
+  if (!g) return;
+  while (g.nextX < ladderX + horizon) {
+    const len = emitPattern(s, g, t);
+    const d = difficultyAt(g.nextX);
+    g.nextX += len + lerp(10, 6.5, d) + rand(g) * 3;
+  }
+  const keep = ladderX - 14;
+  if (s.steps.length > 0 && s.steps[0]!.x1 < keep) s.steps = s.steps.filter((o) => o.x1 >= keep);
+  if (s.lamps.length > 0 && s.lamps[0]!.x < keep) s.lamps = s.lamps.filter((l) => l.x >= keep);
 }

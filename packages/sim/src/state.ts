@@ -68,8 +68,16 @@ export interface BucketState {
   splash: number;
 }
 
+export type LampKind = 'lamp' | 'meat';
+
 export interface LampState {
   id: number;
+  kind: LampKind;
+  /** Cord length, cap radius, damping and mass of this pendulum. */
+  len: number;
+  radius: number;
+  damp: number;
+  mass: number;
   x: number;
   pivotY: number;
   psi: number;
@@ -79,7 +87,7 @@ export interface LampState {
   passed: boolean;
 }
 
-export type StepKind = 'bracket' | 'crate' | 'pallet';
+export type StepKind = 'bracket' | 'crate' | 'pallet' | 'banana' | 'duck' | 'pail' | 'tyre' | 'cheese' | 'stair';
 
 export interface StepObstacle {
   id: number;
@@ -108,6 +116,14 @@ export interface GameEvent {
   y?: number;
 }
 
+export interface GenState {
+  rng: number;
+  nextX: number;
+  nextLampId: number;
+  nextStepId: number;
+  patterns: number;
+}
+
 export interface GameState {
   tick: number;
   time: number;
@@ -116,6 +132,8 @@ export interface GameState {
   bucket: BucketState;
   lamps: LampState[];
   steps: StepObstacle[];
+  /** Procedural level generator (null for fixed levels). */
+  gen: GenState | null;
   balance: number;
   balanceTimer: number;
   score: number;

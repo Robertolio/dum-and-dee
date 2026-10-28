@@ -6,7 +6,7 @@ import { loseWater } from './bucket';
 import { clamp, sign } from './math';
 
 export function lampCapCenter(l: LampState, t: Tuning): { x: number; y: number } {
-  return { x: l.x + t.lampL * Math.sin(l.psi), y: l.pivotY - t.lampL * Math.cos(l.psi) };
+  return { x: l.x + l.len * Math.sin(l.psi), y: l.pivotY - l.len * Math.cos(l.psi) };
 }
 
 /** Pendulum lamps: swing after a hit, keep ticking against the ladder while they cross it. */
@@ -16,9 +16,10 @@ export function integrateLamps(s: GameState, t: Tuning): void {
   const [a, b] = s.players;
 
   for (const l of s.lamps) {
-    const psiDDot = -(t.g / t.lampL) * Math.sin(l.psi) - t.lampD * l.psiDot;
+    const psiDDot = -(t.g / l.len) * Math.sin(l.psi) - l.damp * l.psiDot;
     l.psiDot += psiDDot * dt;
     l.psi += l.psiDot * dt;
+    l.psi = clamp(l.psi, -1.3, 1.3);
     if (l.cooldown > 0) l.cooldown = Math.max(0, l.cooldown - dt);
 
     // Skip lamps far away from the ladder.
@@ -29,16 +30,16 @@ export function integrateLamps(s: GameState, t: Tuning): void {
 
     let cap = lampCapCenter(l, t);
     let hit = closestOnSegment(seg.ax, seg.ay, seg.bx, seg.by, cap.x, cap.y);
-    const rEff = t.lampR + t.ladderThickness / 2;
-    if (segmentCircleOverlap(hit, t.lampR, t.ladderThickness)) {
+    const rEff = l.radius + t.ladderThickness / 2;
+    if (segmentCircleOverlap(hit, l.radius, t.ladderThickness)) {
       // Ladder velocity at the contact point (vertical interpolated between the hands).
       const vLx = (a.v + b.v) / 2 + s.ladder.kickVX;
       const vLy = a.yVel + (b.yVel - a.yVel) * hit.u + s.ladder.kickVY;
       // Cap velocity, tangential to the cord.
       const tx = Math.cos(l.psi);
       const ty = Math.sin(l.psi);
-      const vCx = t.lampL * l.psiDot * tx;
-      const vCy = t.lampL * l.psiDot * ty;
+      const vCx = l.len * l.psiDot * tx;
+      const vCy = l.len * l.psiDot * ty;
       const relX = vLx - vCx;
       const relY = vLy - vCy;
       const vRelRaw = relX * hit.nx + relY * hit.ny;
@@ -48,12 +49,12 @@ export function integrateLamps(s: GameState, t: Tuning): void {
       if (l.cooldown <= 0 && (first || vRelRaw > t.lampTickMinVel)) {
         // A proper knock: impulse on lamp and ladder, splash.
         const vRel = Math.max(vRelRaw, t.lampMinRelVel);
-        const J = t.lampM * (1 + t.lampE) * vRel;
+        const J = l.mass * (1 + t.lampE) * vRel;
         // Swing: tangential projection of the impulse, biased in the direction the ladder moves
         // relative to the cap so a straight-up hit still sets the lamp swinging.
         let tangential = hit.nx * tx + hit.ny * ty;
         tangential = clamp(tangential + t.lampSwingBias * dir * (1 - Math.abs(tangential)), -1, 1);
-        l.psiDot += (J * tangential) / (t.lampM * t.lampL);
+        l.psiDot += (J * tangential) / (l.mass * l.len);
         applyLadderImpulse(s, -J * hit.nx, -J * hit.ny, t);
 
         l.hits += 1;
@@ -65,9 +66,9 @@ export function integrateLamps(s: GameState, t: Tuning): void {
         // Resting/sliding contact: the cap rides on the ladder, no new splash.
         const tn = tx * hit.nx + ty * hit.ny;
         if (Math.abs(tn) > 0.05) {
-          const capNormalVel = t.lampL * l.psiDot * tn;
+          const capNormalVel = l.len * l.psiDot * tn;
           const ladderNormalVel = vLx * hit.nx + vLy * hit.ny;
-          if (capNormalVel < ladderNormalVel) l.psiDot = ladderNormalVel / (t.lampL * tn);
+          if (capNormalVel < ladderNormalVel) l.psiDot = ladderNormalVel / (l.len * tn);
         }
       }
 
@@ -90,11 +91,11 @@ export function integrateLamps(s: GameState, t: Tuning): void {
 
 function maybeScorePass(s: GameState, l: LampState, ladderTailX: number, t: Tuning): void {
   if (l.passed) return;
-  if (ladderTailX > l.x + t.lampR + 0.2) {
+  if (ladderTailX > l.x + l.radius + 0.2) {
     l.passed = true;
     if (l.hits === 0) {
       s.score += t.scoreLampClean;
-      s.events.push({ tick: s.tick, type: 'lampClean', value: t.scoreLampClean, x: l.x, y: l.pivotY - t.lampL });
+      s.events.push({ tick: s.tick, type: 'lampClean', value: t.scoreLampClean, x: l.x, y: l.pivotY - l.len });
     }
   }
 }

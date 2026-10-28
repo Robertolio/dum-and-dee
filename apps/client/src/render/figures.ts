@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS } from '../config';
+import { footPose } from '@dd/sim';
 import type { View } from './view';
 
 export interface FigureStyle {
@@ -25,6 +26,8 @@ export function drawFigure(
   yFloor: number,
   handY: number,
   oof: number,
+  walkPhase = 0,
+  walkAmp = 0,
 ): void {
   const sx = view.sx(x);
   const footY = view.sy(yFloor);
@@ -44,21 +47,24 @@ export function drawFigure(
   const thigh = 0.36;
   const legDrop = hip / 2;
   const kneeFwd = Math.sqrt(Math.max(0, thigh * thigh - legDrop * legDrop)) * 100;
-  const kneeY = footY - legDrop * 100;
+  const kneeY0 = footY - legDrop * 100;
   for (const side of [-1, 1]) {
-    const footX = sx + side * 11;
-    const kneeX = hipX + kneeFwd * 0.9 + side * 6;
+    const pose = footPose(walkPhase, walkAmp, side === -1 ? 0 : 1);
+    const footX = sx + side * 5 + pose.dx * 100;
+    const footLift = pose.lift * 100;
+    const kneeY = kneeY0 - footLift * 0.5;
+    const kneeX = hipX + kneeFwd * 0.9 + side * 3 + pose.dx * 50 + (footLift > 0 ? footLift * 0.5 : 0);
     g.lineStyle(14, style.suitDark);
     g.beginPath();
     g.moveTo(hipX + side * 5, hipY);
     g.lineTo(kneeX, kneeY);
-    g.lineTo(footX, footY - 8);
+    g.lineTo(footX, footY - 8 - footLift);
     g.strokePath();
     g.fillStyle(style.suitDark);
     g.fillCircle(kneeX, kneeY, 7);
     // shoe
     g.fillStyle(COLORS.shoe);
-    g.fillRoundedRect(footX - 10, footY - 10, 26, 10, 4);
+    g.fillRoundedRect(footX - 10, footY - 10 - footLift, 26, 10, 4);
   }
 
   // Torso.

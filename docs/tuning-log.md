@@ -36,3 +36,10 @@ Measured with the headless simulation (`packages/sim`), 60 Hz, default tuning (`
 3. **Walk start cost (~1.3 %).** `aMax = 8` makes every start swing the bucket past 15°. Lower `aMax` for acceleration (heavier feel) or raise `phiSafe` to ~20°?
 4. **Step-ups: shock vs catchability.** With the hand spring (τ 0.10 s + rate 4 /s) the knees cannot absorb a step that is faster than the posture itself; a late reaction even adds a second shock. Current values make a missed crate cost ~0.9 % and a well-timed catch ~0.5 % (plus +50 score). Options for M1: slower steps (`stepRate` 3–4, `tStep` 0.3) so a human can follow, or a faster downward posture (`hFall` 0.06) at the price of harsher bends elsewhere.
 5. **Touch push latch.** On one phone a player has one thumb, so push keeps its last value after release (tap once = walk, drag left and release = stop). Is that acceptable for the two-phone version, or should push require holding the thumb as in the plan?
+
+## Playtest round 2
+
+- `ladderOverhang` 0.6 → 1.2 we (ladder 6.6 we); lamp test windows widened accordingly.
+- Level is now endless (`ENDLESS_LEVEL`, seeded generator in `level.ts`, difficulty rises over ~340 we); obstacles behind the ladder are pruned.
+- New: hanging meat (`meat*` tuning, swings on its own, same collision as lamps), floor props (banana, duck, pail, tyre, cheese), stairs (treads of 0.2 we, walked automatically; risers below 0.25 we do not score).
+- Walk cycle is driven by distance travelled (`walk.ts`), so feet do not slide; legs rest when standing.
