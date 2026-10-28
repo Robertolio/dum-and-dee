@@ -35,6 +35,7 @@ class Sfx {
   private step16 = 0;
   private lastSplash = 0;
   private listeners: (() => void)[] = [];
+  private htmlAudio: HTMLAudioElement | null = null;
 
   get sfxOn(): boolean {
     return this.prefs.sfx;
@@ -70,8 +71,16 @@ class Sfx {
     else this.stopMusic();
   }
 
-  /** Call from a user gesture (tap / key): creates or resumes the context. */
+  /** Call from a user gesture (touchend / pointerup / click / key): creates or resumes the context. */
   unlock(): void {
+    this.unlockHtmlAudio();
+    try {
+      // iOS 17+: play through the media channel so the hardware silent switch does not mute WebAudio.
+      const nav = navigator as Navigator & { audioSession?: { type: string } };
+      if (nav.audioSession) nav.audioSession.type = 'playback';
+    } catch {
+      /* not supported */
+    }
     if (!this.ctx) {
       const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!Ctor) return;
@@ -94,9 +103,78 @@ class Sfx {
       const d = this.noise.getChannelData(0);
       for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
       this.applyBuses();
+      this.ctx.addEventListener('statechange', () => this.stateChanged());
     }
-    if (this.ctx.state !== 'running') void this.ctx.resume();
+    const ctx = this.ctx;
+    const kick = (): void => {
+      // A silent one-sample buffer started inside the gesture fully unlocks old iOS versions.
+      try {
+        const buf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch {
+        /* ignore */
+      }
+    };
+    kick();
+    if (ctx.state !== 'running') {
+      void ctx.resume().then(() => this.stateChanged()).catch(() => undefined);
+    }
+    this.stateChanged();
     if (this.prefs.music) this.startMusic();
+  }
+
+  /** True once sound can actually be heard. */
+  get running(): boolean {
+    return !!this.ctx && this.ctx.state === 'running';
+  }
+
+  private stateChanged(): void {
+    for (const l of this.listeners) l();
+  }
+
+  /** Resume without creating (visibility change, returning from background). */
+  resumeIfNeeded(): void {
+    if (this.ctx && this.ctx.state !== 'running') void this.ctx.resume().then(() => this.stateChanged()).catch(() => undefined);
+  }
+
+  /** Looping silent <audio>: makes iOS treat the page as media playback (plays despite the mute switch). */
+  private unlockHtmlAudio(): void {
+    if (this.htmlAudio) {
+      if (this.htmlAudio.paused) void this.htmlAudio.play().catch(() => undefined);
+      return;
+    }
+    try {
+      const rate = 8000;
+      const samples = 800;
+      const buf = new ArrayBuffer(44 + samples * 2);
+      const v = new DataView(buf);
+      const w = (o: number, t: string): void => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+      w(0, 'RIFF');
+      v.setUint32(4, 36 + samples * 2, true);
+      w(8, 'WAVE');
+      w(12, 'fmt ');
+      v.setUint32(16, 16, true);
+      v.setUint16(20, 1, true);
+      v.setUint16(22, 1, true);
+      v.setUint32(24, rate, true);
+      v.setUint32(28, rate * 2, true);
+      v.setUint16(32, 2, true);
+      v.setUint16(34, 16, true);
+      w(36, 'data');
+      v.setUint32(40, samples * 2, true);
+      const url = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+      const a = new Audio(url);
+      a.loop = true;
+      a.volume = 0.01;
+      a.setAttribute('playsinline', '');
+      this.htmlAudio = a;
+      void a.play().catch(() => undefined);
+    } catch {
+      /* ignore */
+    }
   }
 
   private applyBuses(): void {
@@ -310,6 +388,31 @@ export function mountAudioButtons(): void {
   sfx.onChange(refresh);
   refresh();
   document.body.appendChild(wrap);
-  const unlockOnce = (): void => sfx.unlock();
-  for (const ev of ['pointerdown', 'touchend', 'keydown'] as const) window.addEventListener(ev, unlockOnce, { passive: true });
+  // iOS only accepts unlocking in touchend / pointerup / click (not touchstart / pointerdown).
+  const gesture = (): void => {
+    if (!sfx.running) sfx.unlock();
+  };
+  for (const ev of ['touchend', 'pointerup', 'click', 'keydown'] as const) window.addEventListener(ev, gesture, { capture: true, passive: true });
+  const back = (): void => {
+    if (document.visibilityState === 'visible') sfx.resumeIfNeeded();
+  };
+  document.addEventListener('visibilitychange', back);
+  window.addEventListener('pageshow', back);
+  window.addEventListener('focus', back);
+
+  const hint = document.createElement('button');
+  hint.type = 'button';
+  hint.id = 'sound-hint';
+  hint.textContent = '🔈 Tap for sound';
+  hint.addEventListener('click', (e) => {
+    e.stopPropagation();
+    sfx.unlock();
+  });
+  document.body.appendChild(hint);
+  const syncHint = (): void => {
+    hint.style.display = !sfx.running && (sfx.sfxOn || sfx.musicOn) ? 'block' : 'none';
+  };
+  sfx.onChange(syncHint);
+  window.setInterval(syncHint, 700);
+  syncHint();
 }

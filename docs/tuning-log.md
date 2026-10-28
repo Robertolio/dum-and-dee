@@ -54,3 +54,7 @@ Measured with the headless simulation (`packages/sim`), 60 Hz, default tuning (`
 ## Audio
 
 All sound is WebAudio synthesis (`apps/client/src/audio/sfx.ts`), no assets. The AudioContext is created/resumed on the first tap or key (start button); Phaser's own audio is disabled. Sound and music toggles (bottom right) are stored in `localStorage` key `dd-audio`; master gain 0.6 into a compressor, SFX bus 0.5, music bus 0.07.
+
+## iOS audio unlock
+
+Unlock happens on touchend / pointerup / click / keydown (capture phase), not on touchstart. It sets `navigator.audioSession.type = 'playback'`, loops a silent `<audio>` element, plays a silent buffer and calls `resume()`; it also resumes on visibilitychange / pageshow / focus. A "Tap for sound" pill shows while the context is not running.

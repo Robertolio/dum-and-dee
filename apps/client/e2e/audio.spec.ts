@@ -19,8 +19,10 @@ test.describe('Audio', () => {
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__dd !== undefined);
     expect(await page.evaluate(() => (window as any).__ctxCount)).toBe(0);
+    await expect(page.locator('#sound-hint')).toBeVisible();
     await page.getByTestId('start-button').click();
     expect(await page.evaluate(() => (window as any).__ctxCount)).toBe(1);
+    await expect(page.locator('#sound-hint')).toBeHidden();
     await page.keyboard.down('KeyD');
     await page.keyboard.down('ArrowRight');
     await page.keyboard.press('Space');

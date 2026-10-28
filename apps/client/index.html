@@ -159,6 +159,22 @@
         display: flex;
         gap: 6px;
       }
+      #sound-hint {
+        position: fixed;
+        left: 50%;
+        bottom: max(48px, calc(env(safe-area-inset-bottom) + 40px));
+        transform: translateX(-50%);
+        z-index: 32;
+        padding: 8px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        background: rgba(0, 0, 0, 0.6);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: none;
+      }
       #audio-buttons button {
         width: 34px;
         height: 34px;
