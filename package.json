@@ -10,7 +10,11 @@
     "preview": "pnpm --filter @dd/client preview",
     "test": "pnpm --filter @dd/sim test",
     "test:e2e": "pnpm --filter @dd/client test:e2e",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "start": "node scripts/serve.mjs"
+  },
+  "engines": {
+    "node": ">=20.19"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

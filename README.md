@@ -56,6 +56,17 @@ pnpm typecheck    # tsc for all packages
 pnpm build        # production build of the client
 ```
 
+## Deploy on Railway
+
+Static site, tester-only (`noindex` via meta tag, `X-Robots-Tag` header and `robots.txt`). Config lives in `railway.json`; `scripts/serve.mjs` serves `apps/client/dist` on `$PORT`.
+
+1. railway.com → **New Project** → **Deploy from GitHub repo** → `Robertolio/dum-and-dee` (branch `main`).
+2. Check **Settings**: Root Directory empty (repo root), Build Command `pnpm install --frozen-lockfile && pnpm build`, Start Command `node scripts/serve.mjs` (both come from `railway.json`). No variables are needed; Railway sets `PORT`.
+3. **Settings → Networking → Generate Domain** to get `https://<name>.up.railway.app` (HTTPS is automatic).
+4. Every push to `main` redeploys automatically.
+
+Local check: `pnpm install && pnpm build && PORT=4321 pnpm start`.
+
 ## Project layout
 
 ```
