@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { computeGameWidth, GAME_H } from './config';
 import { GameScene } from './scenes/GameScene';
 import { mountDebugPanel } from './debug/panel';
+import { mountStartScreen } from './ui/start';
 import type { PlayerInput } from '@dd/sim';
 
 const width = computeGameWidth(window.innerWidth, window.innerHeight);
@@ -38,6 +39,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
   const mount = (): void => {
     mountDebugPanel(scene);
     exposeTestHooks(scene);
+    mountStartScreen(scene);
   };
   if (scene.scene.isActive()) mount();
   else scene.events.once(Phaser.Scenes.Events.CREATE, mount);

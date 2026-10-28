@@ -40,7 +40,7 @@ async function touch(page: Page, type: 'touchStart' | 'touchMove' | 'touchEnd', 
 }
 
 async function openGame(page: Page) {
-  await page.goto('/');
+  await page.goto('/?autostart=1');
   await expect(page.locator('#game canvas')).toBeVisible();
   await page.waitForFunction(() => window.__dd !== undefined && window.__dd.getState().tick > 10);
   await page.evaluate(() => window.__dd.setSettings({ source: 'touch', posture: 'analog' }));

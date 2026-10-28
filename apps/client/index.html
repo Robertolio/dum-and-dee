@@ -56,6 +56,100 @@
           display: flex;
         }
       }
+      #start {
+        position: fixed;
+        inset: 0;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(ellipse at center, #1b5560 0%, #0d2b30 75%);
+        padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+          max(16px, env(safe-area-inset-left));
+        box-sizing: border-box;
+      }
+      #start.hidden {
+        display: none;
+      }
+      #start .card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        text-align: center;
+        max-width: 640px;
+      }
+      #start h1 {
+        margin: 0;
+        font-size: 30px;
+        letter-spacing: 0.02em;
+      }
+      #start .mode {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        color: #ffd36b;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      #start .thumbs {
+        display: flex;
+        gap: 14px;
+        font-size: 14px;
+      }
+      #start .thumbs span {
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-weight: 700;
+      }
+      #start .dum {
+        background: #2f6fd0;
+      }
+      #start .dee {
+        background: #d03a3a;
+      }
+      #start .help {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.35;
+        color: #cfe9ec;
+      }
+      #start .seg {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 13px;
+      }
+      #start .seg button {
+        background: #1d4d55;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        padding: 6px 14px;
+        font-size: 14px;
+      }
+      #start .seg button.active {
+        background: #e0a92a;
+        color: #1b1b1b;
+        font-weight: 700;
+      }
+      #start-btn {
+        background: #3fb768;
+        color: #0b2411;
+        border: 0;
+        border-radius: 14px;
+        font-size: 24px;
+        font-weight: 800;
+        padding: 10px 56px;
+        min-height: 52px;
+        touch-action: manipulation;
+      }
+      #start .hint {
+        margin: 0;
+        font-size: 12px;
+        color: #9fd9df;
+        line-height: 1.3;
+      }
       #debug-toggle {
         position: fixed;
         right: max(8px, env(safe-area-inset-right));
@@ -151,6 +245,21 @@
   </head>
   <body>
     <div id="game"></div>
+    <div id="start" data-testid="start-screen">
+      <div class="card">
+        <h1>Dum &amp; Dee</h1>
+        <p class="mode">Solo (two fingers)</p>
+        <div class="thumbs"><span class="dum">Left thumb = Dum</span><span class="dee">Right thumb = Dee</span></div>
+        <p class="help">Left thumb = Dum, right thumb = Dee. Drag up to stand, down to bend, push right to walk.</p>
+        <div class="seg" role="group" aria-label="Posture control">
+          <span>Control:</span>
+          <button type="button" data-testid="start-analog" class="active">Analog</button>
+          <button type="button" data-testid="start-digital">Digital</button>
+        </div>
+        <button id="start-btn" type="button" data-testid="start-button">Start</button>
+        <p class="hint" id="start-hint"></p>
+      </div>
+    </div>
     <div id="rotate">Rotate your phone to landscape to play Dum &amp; Dee.</div>
     <button id="debug-toggle" type="button" aria-label="Debug panel" title="Debug panel">&#9881;</button>
     <div id="debug" aria-label="Debug panel"></div>
