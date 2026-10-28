@@ -14,10 +14,16 @@ export interface PlayerState {
   yFloor: number;
   yFloorVel: number;
   yFloorTarget: number;
+  yFloorTargetSmooth: number;
   stepSlowTimer: number;
   stepping: boolean;
   stepPeakAccel: number;
   stepTime: number;
+  /** Height difference of the current step (we). */
+  stepSize: number;
+  /** Effective hand height when the step began and the largest deviation from it since. */
+  stepHandStart: number;
+  stepHandDev: number;
   slipTimer: number;
   /** Requested hand height above the floor (before arm reach). */
   yHandRaw: number;

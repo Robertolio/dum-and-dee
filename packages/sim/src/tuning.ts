@@ -40,12 +40,16 @@ export interface Tuning {
   // --- Step-ups (floor obstacles) ---
   /** Time constant of the step-up spring (s). */
   tStep: number;
+  /** Rate limit of the step-up target (we/s): how fast the foot lifts (deviates: added). */
+  stepRate: number;
   /** Push multiplier while stepping. */
   stepPushFactor: number;
   /** Duration of the push dip after a step begins (s). */
   stepPushTime: number;
   /** Half width of a player's foot span used for step detection (we). */
   footHalf: number;
+  /** A step counts as caught when the hand moved less than this fraction of the step height. */
+  catchTolerance: number;
 
   // --- Arm reach ---
   /** Max height difference the two players can hold (we). Starts generous. */
@@ -133,10 +137,12 @@ export const DEFAULT_TUNING: Tuning = {
   hUpright: 0.8,
   hBent: 0.2,
 
-  tStep: 0.25,
+  tStep: 0.22,
+  stepRate: 6,
   stepPushFactor: 0.7,
   stepPushTime: 0.3,
   footHalf: 0.25,
+  catchTolerance: 0.5,
 
   dyMax: 1.3,
 
@@ -166,8 +172,8 @@ export const DEFAULT_TUNING: Tuning = {
   kPhi: 0.12,
   aSafe: 6,
   kV: 0.8,
-  jSafe: 60, // deviates from plan (25): vertical jerk only, measured peaks of a calm bend are ~380
-  kJ: 0.03,
+  jSafe: 150, // deviates from plan (25): vertical jerk only; a calm bend peaks at ~380, so this term only bites on real stutter
+  kJ: 0.01,
   accelFilter: 0.05,
 
   lampL: 1.2,

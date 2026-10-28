@@ -84,20 +84,28 @@ describe('step-ups', () => {
 
   it('bending along with the step keeps the hand still: caught, no loss, +50', () => {
     const s = freshState(CRATE_LEVEL);
-    const before = 100;
-    const stats = runWith(
-      s,
-      (st): [PlayerInput, PlayerInput] => [
-        { push: 0.6, hTarget: T.hUpright - st.players[0].yFloor / T.yHandRange },
-        { push: 0.6, hTarget: T.hUpright - st.players[1].yFloor / T.yHandRange },
-      ],
-      6,
-    );
+    const follow = (st: typeof s): [PlayerInput, PlayerInput] => [
+      { push: 0.6, hTarget: T.hUpright - st.players[0].yFloor / T.yHandRange },
+      { push: 0.6, hTarget: T.hUpright - st.players[1].yFloor / T.yHandRange },
+    ];
+    runWith(s, follow, 2); // walk-start swing has damped out, crate still ahead
+    const before = s.bucket.water;
+    const stats = runWith(s, follow, 4);
     const caught = stats.events.filter((e) => e.type === 'stepCaught');
     expect(caught.length).toBeGreaterThanOrEqual(2); // Dee on and off (Dum may follow later)
     expect(stats.events.some((e) => e.type === 'stepMissed')).toBe(false);
-    expect(before - s.bucket.water).toBeLessThan(2.5); // only the walk-start swing
     expect(s.score).toBeGreaterThanOrEqual(2 * T.scoreStepCaught);
+    const lossCaught = before - s.bucket.water;
+
+    // Same crate without bending: more shock, more water lost.
+    const m = freshState(CRATE_LEVEL);
+    runFor(m, upright(0.6), upright(0.6), 2);
+    const beforeMiss = m.bucket.water;
+    const missStats = runFor(m, upright(0.6), upright(0.6), 4);
+    const lossMissed = beforeMiss - m.bucket.water;
+    expect(missStats.peakAPy).toBeGreaterThan(stats.peakAPy);
+    expect(lossMissed).toBeGreaterThan(lossCaught);
+    expect(lossCaught).toBeLessThan(1);
   });
 
   it('the ladder never collides with floor obstacles (no lamp-style events from a crate)', () => {
