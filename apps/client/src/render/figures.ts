@@ -29,7 +29,8 @@ export function drawFigure(
   walkPhase = 0,
   walkAmp = 0,
   slip = 0,
-): void {
+  mouthOpen = false,
+): { headX: number; headY: number } {
   const sx = view.sx(x);
   const footY = view.sy(yFloor);
   const handPy = view.sy(handY);
@@ -108,10 +109,14 @@ export function drawFigure(
   // Face: eye + mouth ("oof" = open mouth).
   g.fillStyle(0x222222);
   g.fillCircle(headX + 7, headY + 1, 2);
-  if (oof > 0) {
+  if (mouthOpen && oof <= 0) {
+    g.fillStyle(0x7a2a2a);
+    g.fillEllipse(headX + 8, headY + 8, 7, 6);
+  } else if (oof > 0) {
     g.fillStyle(0x7a2a2a);
     g.fillCircle(headX + 7, headY + 8, 4);
   } else {
     g.fillRect(headX + 4, headY + 8, 7, 2);
   }
+  return { headX, headY };
 }

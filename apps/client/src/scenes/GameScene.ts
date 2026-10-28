@@ -24,6 +24,7 @@ import { drawLadder } from '../render/ladder';
 import { drawThumb } from '../render/thumbs';
 import { STRINGS } from '../strings';
 import { sfx } from '../audio/sfx';
+import { Speech } from '../render/speech';
 import { ReplayRecorder } from '../debug/replay';
 import { isTouchDevice } from '../platform/fullscreen';
 
@@ -52,6 +53,10 @@ export class GameScene extends Phaser.Scene {
   private walk: [WalkAnim, WalkAnim] = [createWalkAnim(0), createWalkAnim(0)];
   private walkAmp: [number, number] = [0, 0];
   private prevStepIdx: [number, number] = [0, 0];
+  speech!: Speech;
+  private seenAhead = new Set<string>();
+  private waterWarned = false;
+  private lastDt = 1 / 60;
   private prevAir: [boolean, boolean] = [false, false];
   private bucketSprite!: Phaser.GameObjects.Image;
   private splash!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -133,6 +138,8 @@ export class GameScene extends Phaser.Scene {
     this.sparks.setDepth(16);
 
     this.hud = new Hud(this, W);
+    this.speech = new Speech(this);
+    this.speech.onSay = (p, text) => sfx.mumble(p, text.length);
 
     // Controls.
     this.controller = new Controller(this.game.canvas);
@@ -173,6 +180,9 @@ export class GameScene extends Phaser.Scene {
     this.state = createState(ENDLESS_LEVEL, this.tuning);
     this.resetWalk();
     this.accumulator = 0;
+    this.speech.reset();
+    this.seenAhead.clear();
+    this.waterWarned = false;
     this.oof = [0, 0];
     this.overlay?.destroy();
     this.overlay = null;
@@ -223,6 +233,7 @@ export class GameScene extends Phaser.Scene {
 
   override update(_time: number, deltaMs: number): void {
     const dt = Math.min(0.1, deltaMs / 1000);
+    this.lastDt = dt;
     this.fpsSmoothed += (1000 / Math.max(1, deltaMs) - this.fpsSmoothed) * 0.05;
     this.updateInputScale();
     this.accumulator += dt;
@@ -250,7 +261,40 @@ export class GameScene extends Phaser.Scene {
     const target = this.targetCamX();
     this.view.camX += (target - this.view.camX) * Math.min(1, dt * 6);
 
+    this.announce();
     this.render();
+  }
+
+  private nearestPlayer(x?: number): 0 | 1 {
+    if (x === undefined) return 1;
+    const [a, b] = this.state.players;
+    return Math.abs(a.x - x) < Math.abs(b.x - x) ? 0 : 1;
+  }
+
+  /** Context-bound remarks: water trouble and the next hazard ahead of the ladder. */
+  private announce(): void {
+    const s = this.state;
+    if (s.gameOver) return;
+    const water = s.bucket.water;
+    if (water < 25 && !this.waterWarned) {
+      if (this.speech.say(null, 'Careful!', 'hint')) this.waterWarned = true;
+    } else if (water > 60) this.waterWarned = false;
+    if (s.bucket.lossRate > 9) this.speech.say(null, 'Watch out!', 'hint');
+
+    const [a, b] = s.players;
+    const front = Math.max(a.x, b.x) + this.tuning.ladderOverhang;
+    const check = (key: string, x: number, text: string): void => {
+      const d = x - front;
+      if (d < 0.3 || d > 3.6 || this.seenAhead.has(key)) return;
+      if (this.speech.say(null, text, 'hint')) this.seenAhead.add(key);
+    };
+    for (const l of s.lamps) check(`l${l.id}`, l.x - 0.4, 'Duck!');
+    for (const m of s.beams) check(`b${m.id}`, m.x0, 'Duck!');
+    for (const o of s.steps) {
+      if (o.kind === 'stair') continue;
+      if (o.kind === 'banana') check(`s${o.id}`, o.x0, 'Watch out!');
+      else if (o.hObj > this.tuning.autoStepMax) check(`s${o.id}`, o.x0 - 1.0, 'Jump!');
+    }
   }
 
   private playMovementSounds(i: number): void {
@@ -271,6 +315,7 @@ export class GameScene extends Phaser.Scene {
       switch (e.type) {
         case 'bump':
           sfx.bump(e.value ?? 1);
+          this.speech.say(this.nearestPlayer(e.x), 'Ouch!', 'hint');
           break;
         case 'push':
           sfx.push(e.value ?? 1);
@@ -279,6 +324,7 @@ export class GameScene extends Phaser.Scene {
         case 'lampTick': {
           const near = this.state.lamps.reduce((best, l) => (Math.abs(l.x - (e.x ?? 0)) < Math.abs(best.x - (e.x ?? 0)) ? l : best), this.state.lamps[0]!);
           sfx.thud(near?.kind === 'meat');
+          if (e.type === 'lampHit') this.speech.say(this.nearestPlayer(e.x), 'Ouch!', 'hint');
           sfx.splash(e.value ?? 4);
           this.sparks.explode(e.type === 'lampHit' ? 18 : 8, sx, sy + 30);
           this.splashAt(e.type === 'lampHit' ? 20 : 10);
@@ -288,13 +334,16 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'lampClean':
+          this.speech.say(null, 'Nice!', 'cheer');
           this.floatText(sx, sy, `+${e.value} ${STRINGS.cleanPass}`, '#9cf59c');
           break;
         case 'stepCaught':
+          this.speech.say(null, 'Nice!', 'cheer');
           this.floatText(sx, this.view.sy((e.y ?? 0) + 0.9), `+${e.value} ${STRINGS.caught}`, '#9cf59c');
           break;
         case 'slip':
           sfx.slip();
+          this.speech.say((e.player ?? null) as 0 | 1 | null, 'Whoa!', 'urgent');
           sfx.splash(10);
           this.floatText(sx, sy - 70, STRINGS.slip, '#ffd36b');
           this.splashAt(14);
@@ -303,6 +352,7 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'beamHit':
           sfx.bonk();
+          this.speech.say(this.nearestPlayer(e.x), 'Ouch!', 'urgent');
           sfx.splash(e.value ?? 8);
           this.floatText(sx, this.view.sy(e.y ?? 2) + 30, STRINGS.bonk, '#ffd36b');
           this.sparks.explode(12, sx, this.view.sy(e.y ?? 2));
@@ -315,11 +365,13 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'bucketEmpty':
           sfx.lifeLost();
+          this.speech.say(null, 'Oh no!', 'urgent');
           this.floatText(sx, sy - 60, STRINGS.newBucket, '#ffffff');
           this.shake = 0.3;
           break;
         case 'ladderSlipped':
           sfx.lifeLost();
+          this.speech.say(null, 'Oh no!', 'urgent');
           this.floatText(this.scale.width / 2, 200, STRINGS.ladderSlipped, '#ff9f96');
           this.oof = [1, 1];
           this.shake = 0.4;
@@ -330,7 +382,6 @@ export class GameScene extends Phaser.Scene {
           break;
       }
     }
-    if (this.state.bucket.lossRate > 3) sfx.splash(this.state.bucket.lossRate * 0.6);
     if (this.state.bucket.lossRate > 3) this.splashAt(Math.min(6, Math.round(this.state.bucket.lossRate / 3)));
   }
 
@@ -479,8 +530,14 @@ export class GameScene extends Phaser.Scene {
 
     // Figures.
     const [a, b] = s.players;
-    drawFigure(g, view, DUM_STYLE, a.x, a.yFloor + a.jumpY, a.y, this.oof[0]!, this.walk[0]!.phase, a.jumpY > 0 ? 0 : this.walkAmp[0]!, a.slipTimer / this.tuning.slipTime);
-    drawFigure(g, view, DEE_STYLE, b.x, b.yFloor + b.jumpY, b.y, this.oof[1]!, this.walk[1]!.phase, b.jumpY > 0 ? 0 : this.walkAmp[1]!, b.slipTimer / this.tuning.slipTime);
+    const headA = drawFigure(g, view, DUM_STYLE, a.x, a.yFloor + a.jumpY, a.y, this.oof[0]!, this.walk[0]!.phase, a.jumpY > 0 ? 0 : this.walkAmp[0]!, a.slipTimer / this.tuning.slipTime, this.speech.mouthOpen(0));
+    const headB = drawFigure(g, view, DEE_STYLE, b.x, b.yFloor + b.jumpY, b.y, this.oof[1]!, this.walk[1]!.phase, b.jumpY > 0 ? 0 : this.walkAmp[1]!, b.slipTimer / this.tuning.slipTime, this.speech.mouthOpen(1));
+    this.speech.update(this.lastDt, [
+      { x: headA.headX, y: headA.headY },
+      { x: headB.headX, y: headB.headY },
+    ]);
+    const bk = s.bucket;
+    sfx.setSlosh(s.gameOver || bk.water < 3 ? 0 : Math.min(1, Math.abs(bk.phiDot) * 0.28 + Math.abs(bk.phi) * 0.8 + bk.lossRate * 0.04));
 
     // Ladder.
     drawLadder(g, view, s, t);

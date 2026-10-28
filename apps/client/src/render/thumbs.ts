@@ -20,6 +20,9 @@ export function drawThumb(g: Phaser.GameObjects.Graphics, th: ThumbState, color:
     g.strokePath();
   }
 
+  // Analog: no on-screen markers at all; digital shows the two posture positions.
+  if (analog) return;
+
   // Posture bar to the side of the ring.
   const bx = startX + 70;
   const top = startY - 70;

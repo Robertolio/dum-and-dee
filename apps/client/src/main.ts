@@ -61,6 +61,7 @@ function exposeTestHooks(scene: GameScene): void {
     setInputOverride: (inputs: [PlayerInput, PlayerInput] | null) => scene.controller.setOverride(inputs),
     lastInputs: () => scene.lastInputs,
     reset: () => scene.reset(),
+    say: (p: 0 | 1, text: string) => scene.speech.say(p, text, 'urgent'),
   };
   (window as unknown as { __dd: typeof api }).__dd = api;
 }

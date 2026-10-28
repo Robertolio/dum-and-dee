@@ -58,3 +58,9 @@ All sound is WebAudio synthesis (`apps/client/src/audio/sfx.ts`), no assets. The
 ## iOS audio unlock
 
 Unlock happens on touchend / pointerup / click / keydown (capture phase), not on touchstart. It sets `navigator.audioSession.type = 'playback'`, loops a silent `<audio>` element, plays a silent buffer and calls `resume()`; it also resumes on visibilitychange / pageshow / focus. A "Tap for sound" pill shows while the context is not running.
+
+## Speech balloons and water sound
+
+- `render/speech.ts`: comic balloons with mouth animation and per-man "mumble" blips; urgent lines (Ouch!, Whoa!, Oh no!) interrupt, hints (Duck!, Jump!, Watch out!, Careful!) and cheers (Nice!) are rate limited.
+- Splash is now randomised noise wash + bandpass sweep + low "gloop" glides; a continuous brown-noise slosh follows the bucket swing (`setSlosh`).
+- Analog control shows no on-screen markers any more.
