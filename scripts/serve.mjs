@@ -1,10 +1,11 @@
 import { createServer } from 'node:http';
+import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('../apps/client/dist', import.meta.url)));
-const port = Number(process.env.PORT ?? 3000);
+const port = Number(process.env.PORT) || 3000;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -37,7 +38,7 @@ async function resolveFile(urlPath) {
   }
 }
 
-createServer(async (req, res) => {
+const server = () => createServer(async (req, res) => {
   const headers = { 'X-Robots-Tag': 'noindex, nofollow, noarchive', 'X-Content-Type-Options': 'nosniff' };
   try {
     const { pathname } = new URL(req.url ?? '/', 'http://localhost');
@@ -63,4 +64,21 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(400, headers).end();
   }
-}).listen(port, '0.0.0.0', () => console.log(`Serving ${root} on port ${port}`));
+});
+
+process.on('uncaughtException', (e) => console.error('uncaughtException', e));
+process.on('unhandledRejection', (e) => console.error('unhandledRejection', e));
+
+console.log(`node ${process.version}, cwd ${process.cwd()}, PORT=${process.env.PORT ?? '(unset, using 3000)'}`);
+if (!existsSync(join(root, 'index.html'))) {
+  console.error(`WARNING: ${root}/index.html not found: the client build is missing (check the build logs). Serving 404s.`);
+}
+
+// Primary port from Railway, plus the usual dev/preview ports as a safety net in case the public
+// domain's target port was set to one of them in Railway's networking settings.
+const ports = [...new Set([port, 4173, 5173, 3000, 8080])];
+for (const p of ports) {
+  const srv = server();
+  srv.on('error', (e) => console.error(`port ${p}: ${e.code ?? e.message}`));
+  srv.listen(p, '0.0.0.0', () => console.log(`Serving ${root} on 0.0.0.0:${p}${p === port ? ' (PORT)' : ''}`));
+}
