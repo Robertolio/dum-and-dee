@@ -2,7 +2,9 @@ import type { GameState, PlayerId } from './state';
 import type { Tuning } from './tuning';
 import { approach, springStep } from './math';
 
-/** Floor obstacles are step-ups: the player automatically steps on and off, the ladder never collides. */
+import { blocksPlayer, triggerSlip } from './obstacles';
+
+/** Floor obstacles the player can walk onto set the standing height; blocking ones and bananas do not. */
 export function updateStepTargets(s: GameState, t: Tuning): void {
   for (let i = 0; i < 2; i++) {
     const p = s.players[i]!;
@@ -10,7 +12,16 @@ export function updateStepTargets(s: GameState, t: Tuning): void {
     const hi = p.x + t.footHalf;
     let target = 0;
     for (const o of s.steps) {
-      if (hi >= o.x0 && lo <= o.x1 && o.hObj > target) target = o.hObj;
+      if (o.kind === 'banana') {
+        if (!o.used && Math.abs(p.x - (o.x0 + o.x1) / 2) < 0.3 && p.yFloor + p.jumpY < 0.12 && p.slipTimer <= 0) {
+          o.used = true;
+          triggerSlip(s, i as PlayerId, t);
+        }
+        continue;
+      }
+      if (hi < o.x0 || lo > o.x1) continue;
+      if (blocksPlayer(p, o, t)) continue;
+      if (o.hObj > target) target = o.hObj;
     }
     if (target !== p.yFloorTarget) {
       p.stepSize = Math.abs(target - p.yFloorTarget);

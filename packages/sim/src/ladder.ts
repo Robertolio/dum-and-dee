@@ -92,8 +92,8 @@ export function integrateVertical(s: GameState, t: Tuning): void {
   const [a, b] = s.players;
   const dt = t.dt;
 
-  const rawA = a.yFloor + yHand(a.h, t);
-  const rawB = b.yFloor + yHand(b.h, t);
+  const rawA = a.yFloor + t.jumpHand * a.jumpY + yHand(a.h, t);
+  const rawB = b.yFloor + t.jumpHand * b.jumpY + yHand(b.h, t);
   a.yHandRaw = rawA;
   b.yHandRaw = rawB;
 

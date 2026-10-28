@@ -43,3 +43,10 @@ Measured with the headless simulation (`packages/sim`), 60 Hz, default tuning (`
 - Level is now endless (`ENDLESS_LEVEL`, seeded generator in `level.ts`, difficulty rises over ~340 we); obstacles behind the ladder are pruned.
 - New: hanging meat (`meat*` tuning, swings on its own, same collision as lamps), floor props (banana, duck, pail, tyre, cheese), stairs (treads of 0.2 we, walked automatically; risers below 0.25 we do not score).
 - Walk cycle is driven by distance travelled (`walk.ts`), so feet do not slide; legs rest when standing.
+
+## Playtest round 3
+
+- Floor props block: rises above `autoStepMax` (0.22 we) must be jumped (stair treads, 0.2 we, still auto-step). Jump = `PlayerInput.jump` (Space / Enter, thumb flick up or tap on touch); sin² arc of `jumpHeight` 0.9 we over `jumpTime` 0.7 s, the hands follow 30 %.
+- Props slide a little when pushed (mass-based, `pushFriction`), the pair stops via the ladder coupling. Banana: slip unless feet are above 0.12 we under the peel (slow, splash, ladder jolt).
+- Stairs 3–5 risers with a ceiling beam above the plateau (`yBottom` = top + 1.5 we): upright ladder bonks, water loss and rebound.
+- Fix: water in the bucket was an unrotated rectangle; it is now drawn in the bucket frame with a level surface.

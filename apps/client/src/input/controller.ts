@@ -11,6 +11,12 @@ interface TouchSlot {
   y: number;
   /** Push keeps its last value after release so one thumb can both walk and bend. */
   latchedPush: number;
+  /** Recent samples (ms, game y) for flick detection, down time for tap detection, pending jump. */
+  trail: { t: number; y: number }[];
+  downAt: number;
+  moved: number;
+  jumpPending: boolean;
+  lastJumpAt: number;
 }
 
 const H_UP = DEFAULT_TUNING.hUpright;
@@ -85,9 +91,9 @@ export class Controller implements InputProvider {
           const push = pushFromOffset(dx);
           slot.latchedPush = push;
           const hTarget = this.cfg.posture === 'analog' ? postureFromOffset(dy) : dy > 40 ? H_BENT : H_UP;
-          input = { push, hTarget };
+          input = { push, hTarget, jump: this.takeJump(slot) };
         } else {
-          input = { push: slot.latchedPush, hTarget: this.cfg.posture === 'analog' ? H_UP : H_BENT };
+          input = { push: slot.latchedPush, hTarget: this.cfg.posture === 'analog' ? H_UP : H_BENT, jump: this.takeJump(slot) };
         }
         // Keyboard can always take over (useful on a laptop next to the phone).
         const k = kb[i]!;
@@ -106,6 +112,25 @@ export class Controller implements InputProvider {
       th.input = input;
     }
     return out;
+  }
+
+  /** A jump is a quick upward flick of the thumb or a short tap. */
+  private takeJump(slot: TouchSlot): boolean {
+    const now = performance.now();
+    if (slot.pointerId !== null) {
+      const recent = slot.trail.filter((p) => now - p.t < 160);
+      if (recent.length >= 2) {
+        const rise = recent[0]!.y - slot.y;
+        if (rise / this.cssToGame > 38 && now - slot.lastJumpAt > 450) {
+          slot.jumpPending = true;
+          slot.trail = [];
+        }
+      }
+    }
+    if (!slot.jumpPending) return false;
+    slot.jumpPending = false;
+    slot.lastJumpAt = now;
+    return true;
   }
 
   private slotFor(e: PointerEvent): number {
@@ -129,6 +154,9 @@ export class Controller implements InputProvider {
     slot.pointerId = e.pointerId;
     slot.startX = slot.x = x;
     slot.startY = slot.y = y;
+    slot.trail = [{ t: performance.now(), y }];
+    slot.downAt = performance.now();
+    slot.moved = 0;
     try {
       this.canvas.setPointerCapture(e.pointerId);
     } catch {
@@ -141,18 +169,23 @@ export class Controller implements InputProvider {
     if (!slot) return;
     e.preventDefault();
     [slot.x, slot.y] = this.toGame(e);
+    const now = performance.now();
+    slot.trail.push({ t: now, y: slot.y });
+    if (slot.trail.length > 12) slot.trail.shift();
+    slot.moved = Math.max(slot.moved, Math.hypot(slot.x - slot.startX, slot.y - slot.startY) / this.cssToGame);
   };
 
   private onUp = (e: PointerEvent): void => {
     const slot = this.slots.find((s) => s.pointerId === e.pointerId);
     if (!slot) return;
     e.preventDefault?.();
+    if (e.type === 'pointerup' && performance.now() - slot.downAt < 220 && slot.moved < 14) slot.jumpPending = true;
     slot.pointerId = null;
   };
 }
 
 function newSlot(): TouchSlot {
-  return { pointerId: null, startX: 0, startY: 0, x: 0, y: 0, latchedPush: 0 };
+  return { pointerId: null, startX: 0, startY: 0, x: 0, y: 0, latchedPush: 0, trail: [], downAt: 0, moved: 0, jumpPending: false, lastJumpAt: -1e9 };
 }
 
 function newThumb(): ThumbState {

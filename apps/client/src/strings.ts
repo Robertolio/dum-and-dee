@@ -32,8 +32,10 @@ export const STRINGS = {
   ladderSlipped: 'Ladder slipped!',
   niceAndSteady: 'Nice and steady!',
   switchNow: 'Switch!',
-  keyboardHint: 'Dum: W/S bend · A/D walk · L-Shift run  |  Dee: ↑/↓ bend · ←/→ walk · R-Shift run  |  F fullscreen',
+  keyboardHint: 'Dum: W/S bend · A/D walk · L-Shift run  |  Dee: ↑/↓ bend · ←/→ walk · R-Shift run  |  Jump: Space (Dum) · Enter (Dee)  |  F fullscreen',
   touchHintLeft: 'Dum — hold here: drag ↓ to bend, drag → to run',
   touchHintRight: 'Dee — hold here: drag ↓ to bend, drag → to run',
-  touchHintDigital: 'Hold = upright, release = bent · drag → to run',
+  slip: 'Whoa!',
+  bonk: 'Bonk!',
+  touchHintDigital: 'Hold = upright, release = bent · drag → to run · flick ↑ to jump',
 } as const;

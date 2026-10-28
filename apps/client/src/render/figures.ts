@@ -28,6 +28,7 @@ export function drawFigure(
   oof: number,
   walkPhase = 0,
   walkAmp = 0,
+  slip = 0,
 ): void {
   const sx = view.sx(x);
   const footY = view.sy(yFloor);
@@ -38,9 +39,10 @@ export function drawFigure(
   const shoulder = Math.max(0.45, handRel - 0.55);
   const hip = shoulder * 0.56;
   const lean = Math.max(0, 1.25 - shoulder) * 0.25; // lean forward when bent
-  const shoulderX = sx + lean * 100;
+  const slipLean = slip > 0 ? Math.sin(slip * Math.PI * 2.5) * 40 * Math.min(1, slip * 2) : 0;
+  const shoulderX = sx + lean * 100 - slipLean;
   const shoulderY = footY - shoulder * 100;
-  const hipX = sx + lean * 40;
+  const hipX = sx + lean * 40 - slipLean * 0.4;
   const hipY = footY - hip * 100;
 
   // Legs: hip → knee → foot; straight when standing upright, knees forward when squatting.
@@ -51,7 +53,7 @@ export function drawFigure(
   for (const side of [-1, 1]) {
     const pose = footPose(walkPhase, walkAmp, side === -1 ? 0 : 1);
     const footX = sx + side * 5 + pose.dx * 100;
-    const footLift = pose.lift * 100;
+    const footLift = pose.lift * 100 + (slip > 0 ? Math.max(0, Math.sin(slip * Math.PI * 4 + (side > 0 ? 0 : 1.6))) * 22 : 0);
     const kneeY = kneeY0 - footLift * 0.5;
     const kneeX = hipX + kneeFwd * 0.9 + side * 3 + pose.dx * 50 + (footLift > 0 ? footLift * 0.5 : 0);
     g.lineStyle(14, style.suitDark);

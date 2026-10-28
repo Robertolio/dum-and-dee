@@ -7,14 +7,15 @@ interface KeyMap {
   left: string[];
   right: string[];
   run: string[];
+  jump: string[];
 }
 
 const MAPS: [KeyMap, KeyMap] = [
-  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], run: ['ShiftLeft'] },
-  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], run: ['ShiftRight'] },
+  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], run: ['ShiftLeft'], jump: ['Space'] },
+  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], run: ['ShiftRight'], jump: ['Enter', 'NumpadEnter'] },
 ];
 
-const GAME_KEYS = new Set(MAPS.flatMap((m) => [...m.up, ...m.down, ...m.left, ...m.right, ...m.run, 'Space']));
+const GAME_KEYS = new Set(MAPS.flatMap((m) => [...m.up, ...m.down, ...m.left, ...m.right, ...m.run, ...m.jump]));
 
 export interface KeyboardSample {
   /** True when any key of this player is held (keyboard takes priority over touch). */
@@ -58,6 +59,7 @@ export class KeyboardInput {
       const left = this.any(m.left);
       const right = this.any(m.right);
       const run = this.any(m.run);
+      const jump = this.any(m.jump);
       let h = this.hTargets[i]!;
       if (up) h = Math.min(1, h + 3 * dt);
       else if (down) h = Math.max(0, h - 3 * dt);
@@ -68,7 +70,7 @@ export class KeyboardInput {
       let push = 0;
       if (right) push = run ? 1 : 0.6;
       else if (left) push = -0.3;
-      out.push({ active: up || down || left || right || run, input: { push, hTarget } });
+      out.push({ active: up || down || left || right || run || jump, input: { push, hTarget, jump } });
     }
     return out as [KeyboardSample, KeyboardSample];
   }

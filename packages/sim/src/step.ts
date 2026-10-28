@@ -8,7 +8,8 @@ import { integrateHorizontal, integrateVertical, resetPlayerRow, yHand } from '.
 import { evaluateStepCatch, integrateStepUps, updateStepTargets } from './stepup';
 import { integrateBucket, primeBucket } from './bucket';
 import { integrateLamps } from './lamp';
-import { buildLamps, buildSteps, createGen, ENDLESS_LEVEL, extendLevel, type LevelData } from './level';
+import { integrateBeams, integrateJump, resolveObstacles } from './obstacles';
+import { buildBeams, buildLamps, buildSteps, createGen, ENDLESS_LEVEL, extendLevel, type LevelData } from './level';
 
 export function createPlayer(x: number, t: Tuning): PlayerState {
   const h = t.hUpright;
@@ -32,6 +33,10 @@ export function createPlayer(x: number, t: Tuning): PlayerState {
     stepHandStart: yHand(h, t),
     stepHandDev: 0,
     slipTimer: 0,
+    jumpT: 0,
+    jumpY: 0,
+    jumpHeld: false,
+    jumpReq: false,
     yHandRaw: yHand(h, t),
     y: yHand(h, t),
     yVel: 0,
@@ -74,6 +79,7 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
     },
     lamps: buildLamps(level, t),
     steps: buildSteps(level),
+    beams: buildBeams(level),
     gen: null,
     balance: 0,
     balanceTimer: 0,
@@ -83,7 +89,7 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
     gameOver: false,
     events: [],
   };
-  s.gen = createGen(level, s.lamps.length, s.steps.length);
+  s.gen = createGen(level, s.lamps.length, s.steps.length, s.beams.length);
   extendLevel(s, startX, t);
   primeBucket(s);
   return s;
@@ -165,15 +171,20 @@ export function step(s: GameState, inputs: readonly [PlayerInput, PlayerInput], 
     const p = s.players[i]!;
     p.hTarget = inp.hTarget;
     p.push = inp.push;
+    p.jumpReq = !!inp.jump && !p.jumpHeld;
+    p.jumpHeld = !!inp.jump;
   }
 
   extendLevel(s, (s.players[0].x + s.players[1].x) / 2, t);
   updateStepTargets(s, t);
   integrateStepUps(s, t);
+  for (const p of s.players) integrateJump(p, t);
   for (const p of s.players) integratePosture(p, t);
   integrateHorizontal(s, t);
+  resolveObstacles(s, t);
   integrateVertical(s, t);
   integrateLamps(s, t);
+  integrateBeams(s, t);
   integrateBucket(s, t);
   evaluateStepCatch(s, t);
   updateBalance(s, t);

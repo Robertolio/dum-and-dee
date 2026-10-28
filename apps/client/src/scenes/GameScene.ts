@@ -99,7 +99,7 @@ export class GameScene extends Phaser.Scene {
     this.bucketSprite = this.add.image(0, 0, 'bucket').setOrigin(0.5, 0.04).setDepth(11);
 
     this.gWorld = this.add.graphics().setDepth(10);
-    this.gFx = this.add.graphics().setDepth(20);
+    this.gFx = this.add.graphics().setDepth(11.5);
     this.gThumbs = this.add.graphics().setDepth(60);
 
     // Particles.
@@ -266,6 +266,19 @@ export class GameScene extends Phaser.Scene {
         case 'stepCaught':
           this.floatText(sx, this.view.sy((e.y ?? 0) + 0.9), `+${e.value} ${STRINGS.caught}`, '#9cf59c');
           break;
+        case 'slip':
+          this.floatText(sx, sy - 70, STRINGS.slip, '#ffd36b');
+          this.splashAt(14);
+          this.shake = 0.25;
+          if (e.player !== undefined) this.oof[e.player] = 0.8;
+          break;
+        case 'beamHit':
+          this.floatText(sx, this.view.sy(e.y ?? 2) + 30, STRINGS.bonk, '#ffd36b');
+          this.sparks.explode(12, sx, this.view.sy(e.y ?? 2));
+          this.splashAt(10);
+          this.oof = [0.6, 0.6];
+          this.shake = 0.3;
+          break;
         case 'stepMissed':
           this.splashAt(8);
           break;
@@ -337,7 +350,23 @@ export class GameScene extends Phaser.Scene {
         img.setDisplaySize((o.x1 - o.x0) * PX, o.hObj * PX);
         this.stepSprites.set(o.id, img);
       }
-      img.setPosition(x0, FLOOR_Y + 2);
+      img.setPosition(x0, FLOOR_Y + 2).setAlpha(o.used ? 0.75 : 1);
+    }
+    for (const m of this.state.beams) {
+      const x0 = view.sx(m.x0);
+      const x1 = view.sx(m.x1);
+      if (x1 < -40 || x0 > this.scale.width + 40) continue;
+      const bottom = view.sy(m.yBottom);
+      gp.fillStyle(0x4a545c);
+      gp.fillRect(x0, 40, x1 - x0, bottom - 40);
+      gp.fillStyle(0x6c7882);
+      gp.fillRect(x0, 40, x1 - x0, 8);
+      for (let sx = x0; sx < x1; sx += 28) {
+        gp.fillStyle(0xf2c43d);
+        gp.fillRect(sx, bottom - 12, Math.min(14, x1 - sx), 12);
+      }
+      gp.lineStyle(2, 0x222a30);
+      gp.strokeRect(x0, 40, x1 - x0, bottom - 40);
     }
     for (const [id, img] of this.stepSprites) {
       if (!live.has(id)) {
@@ -415,8 +444,8 @@ export class GameScene extends Phaser.Scene {
 
     // Figures.
     const [a, b] = s.players;
-    drawFigure(g, view, DUM_STYLE, a.x, a.yFloor, a.y, this.oof[0]!, this.walk[0]!.phase, this.walkAmp[0]!);
-    drawFigure(g, view, DEE_STYLE, b.x, b.yFloor, b.y, this.oof[1]!, this.walk[1]!.phase, this.walkAmp[1]!);
+    drawFigure(g, view, DUM_STYLE, a.x, a.yFloor + a.jumpY, a.y, this.oof[0]!, this.walk[0]!.phase, a.jumpY > 0 ? 0 : this.walkAmp[0]!, a.slipTimer / this.tuning.slipTime);
+    drawFigure(g, view, DEE_STYLE, b.x, b.yFloor + b.jumpY, b.y, this.oof[1]!, this.walk[1]!.phase, b.jumpY > 0 ? 0 : this.walkAmp[1]!, b.slipTimer / this.tuning.slipTime);
 
     // Ladder.
     drawLadder(g, view, s, t);
@@ -433,17 +462,50 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(COLORS.ladderDark);
     g.fillCircle(hx, hy, 5);
     this.bucketSprite.setPosition(bx, by).setRotation(-B.phi);
-    // Water fill level inside the bucket, drawn over the sprite.
+    // Water inside the bucket: drawn in the bucket's rotated frame with a level surface.
     const fill = B.water / 100;
     const fx = this.gFx;
     fx.clear();
     const bucketW = 30;
+    const bucketTop = 10;
     const bucketH = 26;
-    const level = by + 10 + bucketH * (1 - fill);
-    fx.fillStyle(COLORS.water);
-    fx.fillRect(bx - bucketW / 2 + 1, level, bucketW - 2, by + 10 + bucketH - level);
-    fx.fillStyle(0xffffff, 0.35);
-    fx.fillRect(bx - bucketW / 2 + 1, level, bucketW - 2, 3);
+    const theta = -B.phi;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    const toScreen = (lx: number, ly: number): [number, number] => [bx + lx * cos - ly * sin, by + lx * sin + ly * cos];
+    const surface = bucketTop + bucketH * (1 - fill);
+    const up: [number, number] = [-sin, -cos];
+    let poly: [number, number][] = [
+      [-bucketW / 2 + 1, bucketTop],
+      [bucketW / 2 - 1, bucketTop],
+      [bucketW / 2 - 3, bucketTop + bucketH],
+      [-bucketW / 2 + 3, bucketTop + bucketH],
+    ];
+    const side = (p: [number, number]): number => (p[0] * up[0] + (p[1] - surface) * up[1]);
+    const clipped: [number, number][] = [];
+    for (let i = 0; i < poly.length; i++) {
+      const p = poly[i]!;
+      const q = poly[(i + 1) % poly.length]!;
+      const sp = side(p);
+      const sq = side(q);
+      if (sp <= 0) clipped.push(p);
+      if (sp <= 0 !== sq <= 0) {
+        const u = sp / (sp - sq);
+        clipped.push([p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u]);
+      }
+    }
+    poly = clipped;
+    if (poly.length >= 3 && fill > 0.01) {
+      fx.fillStyle(COLORS.water);
+      fx.beginPath();
+      poly.forEach((p, i) => {
+        const [px, py] = toScreen(p[0], p[1]);
+        if (i === 0) fx.moveTo(px, py);
+        else fx.lineTo(px, py);
+      });
+      fx.closePath();
+      fx.fillPath();
+    }
 
     // Thumb feedback.
     const thumbs = this.controller.thumbs();

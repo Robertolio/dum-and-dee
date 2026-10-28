@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { lampCapCenter, type LevelData, type PlayerInput } from '../src/index';
 import { bent, freshState, runFor, runWith, T, upright } from './helpers';
 
@@ -65,7 +65,15 @@ describe('hanging lamp', () => {
   });
 });
 
-describe('step-ups', () => {
+describe('step-ups (crate walked onto: auto-step allowed)', () => {
+  const saved = T.autoStepMax;
+  beforeEach(() => {
+    T.autoStepMax = 1;
+  });
+  afterEach(() => {
+    T.autoStepMax = saved;
+  });
+
   it('stepping on a crate without bending raises the hand and shocks the bucket', () => {
     const s = freshState(CRATE_LEVEL);
     let maxYB = 0;

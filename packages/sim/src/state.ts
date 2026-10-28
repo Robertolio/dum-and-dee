@@ -25,6 +25,11 @@ export interface PlayerState {
   stepHandStart: number;
   stepHandDev: number;
   slipTimer: number;
+  /** Jump: time since take-off (0 = on the ground), body arc height (we), previous jump input. */
+  jumpT: number;
+  jumpY: number;
+  jumpHeld: boolean;
+  jumpReq: boolean;
   /** Requested hand height above the floor (before arm reach). */
   yHandRaw: number;
   /** Effective hand height (after arm reach and ladder kick). */
@@ -95,6 +100,20 @@ export interface StepObstacle {
   x1: number;
   hObj: number;
   kind: StepKind;
+  /** Pushable props: mass, sliding velocity and total distance slid. Bananas: `used` once slipped on. */
+  mass: number;
+  vx: number;
+  slid: number;
+  used: boolean;
+}
+
+export interface BeamObstacle {
+  id: number;
+  x0: number;
+  x1: number;
+  /** Height of the underside of the beam (we). */
+  yBottom: number;
+  cooldown: number;
 }
 
 export type GameEventType =
@@ -104,6 +123,8 @@ export type GameEventType =
   | 'stepCaught'
   | 'stepMissed'
   | 'bucketEmpty'
+  | 'slip'
+  | 'beamHit'
   | 'ladderSlipped'
   | 'gameOver';
 
@@ -121,6 +142,7 @@ export interface GenState {
   nextX: number;
   nextLampId: number;
   nextStepId: number;
+  nextBeamId: number;
   patterns: number;
 }
 
@@ -132,6 +154,7 @@ export interface GameState {
   bucket: BucketState;
   lamps: LampState[];
   steps: StepObstacle[];
+  beams: BeamObstacle[];
   /** Procedural level generator (null for fixed levels). */
   gen: GenState | null;
   balance: number;

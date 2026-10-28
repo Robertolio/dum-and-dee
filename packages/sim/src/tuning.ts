@@ -51,6 +51,24 @@ export interface Tuning {
   /** A step counts as caught when the hand moved less than this fraction of the step height. */
   catchTolerance: number;
 
+  // --- Obstacles, jumping, slipping ---
+  /** Rise (we) a player walks up automatically (stair treads); anything higher blocks unless jumped. */
+  autoStepMax: number;
+  /** Jump duration (s), height of the body arc (we) and the share of it the hands follow (knees absorb the rest). */
+  jumpTime: number;
+  jumpHeight: number;
+  jumpHand: number;
+  /** Friction deceleration of a pushed obstacle (we/s²). */
+  pushFriction: number;
+  /** Banana slip: duration (s), water loss, ladder jolt. */
+  slipTime: number;
+  slipSplash: number;
+  slipKick: number;
+  /** Ceiling beam hit: water loss, rebound speed of both players (we/s), cooldown (s). */
+  beamSplash: number;
+  beamRebound: number;
+  beamCooldown: number;
+
   // --- Arm reach ---
   /** Max height difference the two players can hold (we). Starts generous. */
   dyMax: number;
@@ -152,6 +170,18 @@ export const DEFAULT_TUNING: Tuning = {
   stepPushTime: 0.3,
   footHalf: 0.25,
   catchTolerance: 0.5,
+
+  autoStepMax: 0.22,
+  jumpTime: 0.7,
+  jumpHeight: 0.9,
+  jumpHand: 0.3,
+  pushFriction: 5,
+  slipTime: 0.9,
+  slipSplash: 10,
+  slipKick: 1.2,
+  beamSplash: 12,
+  beamRebound: 1.5,
+  beamCooldown: 0.7,
 
   dyMax: 1.3,
 
