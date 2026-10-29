@@ -64,3 +64,9 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 - `render/speech.ts`: comic balloons with mouth animation and per-man "mumble" blips; urgent lines (Ouch!, Whoa!, Oh no!) interrupt, hints (Duck!, Jump!, Watch out!, Careful!) and cheers (Nice!) are rate limited.
 - Splash is now randomised noise wash + bandpass sweep + low "gloop" glides; a continuous brown-noise slosh follows the bucket swing (`setSlosh`).
 - Analog control shows no on-screen markers any more.
+
+## Round 4 tweaks
+
+- Ladder overhang 1.2 → 1.52 we (one rung spacing, 0.32 we, more at each end); ladder length 7.24 we.
+- Water audio is now cartoon-like: sine "bloop" bubbles with rising pitch, drip plinks, short high-passed sploosh; the continuous slosh is a very quiet airy hiss with sparse gurgles.
+- Lamp light cone and glow rotate with the lamp's swing (axis follows the cord direction).

@@ -289,26 +289,31 @@ class Sfx {
   }
 
   /**
-   * Water splash scaled by the amount lost (0…~20): a soft filtered-noise wash with a falling bandpass sweep
-   * plus a few random low "gloop" bubbles. Everything is randomised, no fixed repeat interval.
+   * Cartoon water: bright "bloop" bubbles (sine, fast rising pitch), drip plinks and a short airy high-passed
+   * sploosh. No low rumble. Everything randomised; more water lost = more bubbles and a bit louder.
    */
   splash(amount: number): void {
     if (!this.ready()) return;
     const a = Math.min(1, amount / 14);
     const r = Math.random;
-    const dur = 0.25 + a * 0.5 + r() * 0.15;
-    const f0 = 1800 + r() * 1400;
-    this.shaped('bandpass', f0, 0.9 + r() * 0.6, dur, 0.05 + a * 0.2, 0.03 + r() * 0.04, 0, f0 * (0.2 + r() * 0.15));
-    this.shaped('lowpass', 700 + r() * 500, 0.5, dur * 1.4, 0.04 + a * 0.12, 0.05, 0.02, 250);
-    const bubbles = 1 + Math.floor(a * 3 + r() * 2);
-    for (let i = 0; i < bubbles; i++) this.gloop(0.04 + r() * 0.35, 0.05 + a * 0.12 + r() * 0.05);
+    this.shaped('highpass', 1800 + r() * 1500, 0.7, 0.07 + a * 0.1 + r() * 0.05, 0.03 + a * 0.08, 0.006, 0);
+    const bubbles = 2 + Math.floor(a * 4 + r() * 2);
+    for (let i = 0; i < bubbles; i++) this.bloop(0.01 + r() * (0.12 + a * 0.25), 0.07 + a * 0.1 + r() * 0.05);
+    const drips = r() < 0.6 + a * 0.3 ? 1 + Math.floor(r() * 2) : 0;
+    for (let i = 0; i < drips; i++) this.plink(0.1 + r() * 0.35, 0.04 + a * 0.04);
   }
 
-  /** One bubble: a low sine whose pitch glides up quickly. */
-  private gloop(delay: number, vol: number): void {
-    const f = 140 + Math.random() * 260;
-    const dur = 0.07 + Math.random() * 0.08;
-    this.tone('sine', f, f * (1.6 + Math.random() * 0.8), dur, vol, delay);
+  /** One bubble: short sine with a quickly rising pitch (~400-1200 Hz) and a tiny decay. */
+  private bloop(delay: number, vol: number): void {
+    const f = 400 + Math.random() * 450;
+    const f1 = Math.min(1300, f * (1.7 + Math.random() * 1.0));
+    this.tone('sine', f, f1, 0.05 + Math.random() * 0.07, vol, delay);
+  }
+
+  /** Tiny high drip. */
+  private plink(delay: number, vol: number): void {
+    const f = 1500 + Math.random() * 1200;
+    this.tone('sine', f, f * (0.85 + Math.random() * 0.3), 0.06 + Math.random() * 0.04, vol, delay);
   }
 
   /** Noise with soft attack/decay through a (sweeping) filter. */
@@ -317,7 +322,7 @@ class Sfx {
     const t0 = c.currentTime + delay;
     const src = c.createBufferSource();
     src.buffer = this.noise;
-    src.playbackRate.value = 0.7 + Math.random() * 0.6;
+    src.playbackRate.value = 0.8 + Math.random() * 0.5;
     const f = c.createBiquadFilter();
     f.type = filter;
     f.frequency.setValueAtTime(freq, t0);
@@ -332,26 +337,18 @@ class Sfx {
     src.stop(t0 + dur + 0.05);
   }
 
-  /** Continuous soft water slosh that follows the bucket's swing (level 0…1). */
+  /** Continuous, very light slosh following the bucket swing (level 0…1): faint airy hiss plus sparse gurgles. */
   setSlosh(level: number): void {
-    if (!this.ctx || !this.sfxBus) return;
+    if (!this.ctx || !this.sfxBus || !this.noise) return;
     if (!this.sloshGain) {
       const c = this.ctx;
-      const n = c.sampleRate * 2;
-      const buf = c.createBuffer(1, n, c.sampleRate);
-      const d = buf.getChannelData(0);
-      let last = 0;
-      for (let i = 0; i < n; i++) {
-        last = (last + 0.04 * (Math.random() * 2 - 1)) / 1.04; // brown-ish noise: smooth, not clicky
-        d[i] = last * 14;
-      }
       const src = c.createBufferSource();
-      src.buffer = buf;
+      src.buffer = this.noise;
       src.loop = true;
       this.sloshFilter = c.createBiquadFilter();
-      this.sloshFilter.type = 'bandpass';
-      this.sloshFilter.frequency.value = 500;
-      this.sloshFilter.Q.value = 0.8;
+      this.sloshFilter.type = 'highpass';
+      this.sloshFilter.frequency.value = 2600;
+      this.sloshFilter.Q.value = 0.5;
       this.sloshGain = c.createGain();
       this.sloshGain.gain.value = 0;
       src.connect(this.sloshFilter).connect(this.sloshGain).connect(this.sfxBus);
@@ -360,8 +357,9 @@ class Sfx {
     const run = this.ready();
     const l = run ? Math.max(0, Math.min(1, level)) : 0;
     const now = this.ctx.currentTime;
-    this.sloshGain.gain.setTargetAtTime(l * l * 0.5, now, 0.12);
-    this.sloshFilter!.frequency.setTargetAtTime(380 + l * 700 + Math.random() * 120, now, 0.1);
+    this.sloshGain.gain.setTargetAtTime(l * l * 0.05, now, 0.15);
+    this.sloshFilter!.frequency.setTargetAtTime(2400 + l * 1800, now, 0.15);
+    if (run && l > 0.12 && Math.random() < l * 0.012) this.bloop(0, 0.03 + l * 0.04);
   }
 
   /** Tiny formant "mumble" for a speech balloon: a few short voiced blips, different pitch per man. */

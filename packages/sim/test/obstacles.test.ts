@@ -30,8 +30,8 @@ describe('hanging lamp', () => {
       (st): [PlayerInput, PlayerInput] => {
         const [a, b] = st.players;
         const u = (lampX - a.x) / (b.x - a.x); // 1 = at Dee, 0 = at Dum
-        if (u > 0.5 && u < 1.45) return [upright(0.6), bent(0.6)];
-        if (u <= 0.5 && u > -0.45) return [bent(0.6), upright(0.6)];
+        if (u > 0.5 && u < 1.6) return [upright(0.6), bent(0.6)];
+        if (u <= 0.5 && u > -0.6) return [bent(0.6), upright(0.6)];
         return [upright(0.6), upright(0.6)];
       },
       10,
@@ -49,8 +49,8 @@ describe('hanging lamp', () => {
       (st): [PlayerInput, PlayerInput] => {
         const [a, b] = st.players;
         const u = (14 - a.x) / (b.x - a.x);
-        if (u > 0.85 && u < 1.45) return [upright(0.6), bent(0.6)];
-        if (u <= 0.85 && u > -0.45) return [bent(0.6), upright(0.6)]; // switched too early
+        if (u > 0.85 && u < 1.6) return [upright(0.6), bent(0.6)];
+        if (u <= 0.85 && u > -0.6) return [bent(0.6), upright(0.6)]; // switched too early
         return [upright(0.6), upright(0.6)];
       },
       10,

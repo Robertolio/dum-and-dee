@@ -512,14 +512,28 @@ export class GameScene extends Phaser.Scene {
       const clearance = ladderHeightAt(s, l.x) + t.ladderThickness / 2 < cap.y - l.radius;
       const near = Math.abs(l.x - (s.players[0].x + s.players[1].x) / 2) < 6;
       const color = !near ? 0xfff0b0 : clearance ? COLORS.balanceGreen : COLORS.balanceOrange;
+      // Light cone and glow share the lamp's pivot rotation: the axis follows the cord direction.
+      const dx = Math.sin(l.psi);
+      const dy = Math.cos(l.psi);
+      const nx = dy;
+      const ny = -dx;
+      const sxp = cx + dx * (l.radius * PX - 8);
+      const syp = cy + dy * (l.radius * PX - 8);
+      const reach = Math.max(40, (FLOOR_Y - syp) / Math.max(0.3, dy));
+      const fx0 = sxp + dx * reach;
+      const fy0 = syp + dy * reach;
       g.fillStyle(color, 0.16);
       g.beginPath();
-      g.moveTo(cx - 18, cy + l.radius * PX - 8);
-      g.lineTo(cx + 18, cy + l.radius * PX - 8);
-      g.lineTo(cx + 110, FLOOR_Y);
-      g.lineTo(cx - 110, FLOOR_Y);
+      g.moveTo(sxp - nx * 18, syp - ny * 18);
+      g.lineTo(sxp + nx * 18, syp + ny * 18);
+      g.lineTo(fx0 + nx * 110, Math.min(FLOOR_Y, fy0 + ny * 110));
+      g.lineTo(fx0 - nx * 110, Math.min(FLOOR_Y, fy0 - ny * 110));
       g.closePath();
       g.fillPath();
+      g.fillStyle(0xfff3c0, 0.28);
+      g.fillCircle(sxp, syp, 20);
+      g.fillStyle(0xfff3c0, 0.5);
+      g.fillCircle(sxp, syp, 10);
     }
     for (const [id, img] of this.lampSprites) {
       if (!live.has(id)) {

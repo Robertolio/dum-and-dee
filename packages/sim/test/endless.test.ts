@@ -3,8 +3,8 @@ import { advanceWalk, createState, createWalkAnim, ENDLESS_LEVEL, footPose, WALK
 import { freshState, runFor, T, upright } from './helpers';
 
 describe('ladder overhang', () => {
-  it('overhangs the hands by 1.2 we on each side', () => {
-    expect(T.ladderOverhang).toBeGreaterThanOrEqual(1.2);
+  it('overhangs the hands by 1.2 + one rung (0.32) we on each side', () => {
+    expect(T.ladderOverhang).toBeGreaterThanOrEqual(1.5);
     expect(T.ladderLength).toBeCloseTo(T.L0 + 2 * T.ladderOverhang, 6);
   });
 });

@@ -194,8 +194,8 @@ export const DEFAULT_TUNING: Tuning = {
   balanceFailTime: 0.6,
   balanceRest: 0.35,
 
-  ladderLength: 6.6, // L0 + 2 × overhang
-  ladderOverhang: 1.2, // playtest: ladder sticks out much further over the shoulders
+  ladderLength: 7.24, // L0 + 2 × overhang
+  ladderOverhang: 1.52, // 1.2 + one rung spacing (0.32 we) // playtest: ladder sticks out much further over the shoulders
   ladderThickness: 0.15,
   mLadder: 1,
 
