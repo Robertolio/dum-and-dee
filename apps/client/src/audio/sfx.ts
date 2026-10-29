@@ -362,6 +362,20 @@ class Sfx {
     if (run && l > 0.12 && Math.random() < l * 0.012) this.bloop(0, 0.03 + l * 0.04);
   }
 
+  /** Balloon pop: a sharp noise crack with a fast falling blip. */
+  pop(): void {
+    if (!this.ready()) return;
+    this.shaped('highpass', 1200, 0.7, 0.09, 0.4, 0.002, 0);
+    this.tone('sine', 900, 180, 0.07, 0.3);
+    this.tone('triangle', 1500, 400, 0.04, 0.12);
+  }
+
+  /** Soft "fwip" when a cobweb is swept away. */
+  fwip(): void {
+    if (!this.ready()) return;
+    this.shaped('bandpass', 700, 1.2, 0.16, 0.12, 0.05, 0, 3200);
+  }
+
   /** Tiny formant "mumble" for a speech balloon: a few short voiced blips, different pitch per man. */
   mumble(player: 0 | 1, length: number): void {
     if (!this.ready()) return;

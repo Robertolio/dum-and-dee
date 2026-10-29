@@ -48,6 +48,8 @@ export class GameScene extends Phaser.Scene {
   private gThumbs!: Phaser.GameObjects.Graphics;
   private layers: { wall: Phaser.GameObjects.TileSprite; pipes: Phaser.GameObjects.TileSprite; floor: Phaser.GameObjects.TileSprite; ceiling: Phaser.GameObjects.TileSprite } | null = null;
   private stepSprites = new Map<number, Phaser.GameObjects.Image>();
+  private softSprites = new Map<number, Phaser.GameObjects.Image>();
+  private confetti!: Phaser.GameObjects.Particles.ParticleEmitter;
   private lampSprites = new Map<number, Phaser.GameObjects.Image>();
   private gProps!: Phaser.GameObjects.Graphics;
   private walk: [WalkAnim, WalkAnim] = [createWalkAnim(0), createWalkAnim(0)];
@@ -86,6 +88,8 @@ export class GameScene extends Phaser.Scene {
     this.load.svg('tyre', 'art/tyre.svg', { width: 100, height: 40 });
     this.load.svg('cheese', 'art/cheese.svg', { width: 100, height: 30 });
     this.load.svg('meat', 'art/meat.svg', { width: 100, height: 120 });
+    this.load.svg('balloon', 'art/balloon.svg', { width: 60, height: 80 });
+    this.load.svg('web', 'art/web.svg', { width: 100, height: 100 });
     this.load.svg('lamp-cap', 'art/lamp-cap.svg', { width: 80, height: 60 });
     this.load.svg('bucket', 'art/bucket.svg', { width: 48, height: 52 });
   }
@@ -136,6 +140,16 @@ export class GameScene extends Phaser.Scene {
       emitting: false,
     });
     this.sparks.setDepth(16);
+    this.confetti = this.add.particles(0, 0, 'dot', {
+      speed: { min: 80, max: 300 },
+      angle: { min: 0, max: 360 },
+      gravityY: 500,
+      lifespan: { min: 700, max: 1300 },
+      scale: { start: 1.1, end: 0.5 },
+      tint: [0xff5a5f, 0xffd23f, 0x3bceac, 0x4ea8de, 0xb084f5, 0xff9f1c],
+      emitting: false,
+    });
+    this.confetti.setDepth(17);
 
     this.hud = new Hud(this, W);
     this.speech = new Speech(this);
@@ -333,6 +347,15 @@ export class GameScene extends Phaser.Scene {
           if (e.type === 'lampHit') this.floatText(sx, sy - 10, STRINGS.oof, '#ffd36b');
           break;
         }
+        case 'pop':
+          sfx.pop();
+          this.confetti.explode(34, sx, sy);
+          this.floatText(sx, sy - 24, `+${e.value}`, '#ffd36b');
+          break;
+        case 'sweep':
+          sfx.fwip();
+          this.floatText(sx, sy - 24, `+${e.value}`, '#dff3f5');
+          break;
         case 'lampClean':
           this.speech.say(null, 'Nice!', 'cheer');
           this.floatText(sx, sy, `+${e.value} ${STRINGS.cleanPass}`, '#9cf59c');
@@ -409,6 +432,45 @@ export class GameScene extends Phaser.Scene {
     this.overlay = this.add.container(0, 0, [bg, title, score, hint]).setDepth(80);
   }
 
+  private syncSofts(): void {
+    const view = this.view;
+    const gs = this.gProps;
+    const live = new Set<number>();
+    const now = this.time.now / 1000;
+    for (const o of this.state.softs) {
+      if (o.done) continue;
+      const px = view.sx(o.x);
+      if (px < -80 || px > this.scale.width + 80) continue;
+      live.add(o.id);
+      let img = this.softSprites.get(o.id);
+      if (!img) {
+        img = this.add.image(0, 0, o.kind).setDepth(o.kind === 'balloon' ? 13 : 12);
+        if (o.kind === 'balloon') {
+          const palette = [0xff5a5f, 0xffd23f, 0x3bceac, 0x4ea8de, 0xb084f5, 0xff9f1c];
+          img.setTint(palette[o.color % palette.length]!);
+          img.setDisplaySize(o.r * 2 * PX * 1.15, o.r * 2 * PX * 1.5);
+        } else {
+          img.setDisplaySize(o.r * 2 * PX * 1.25, o.r * 2 * PX * 1.25);
+        }
+        this.softSprites.set(o.id, img);
+      }
+      const bob = Math.sin(now * 1.6 + o.id) * (o.kind === 'balloon' ? 4 : 1.5);
+      const py = view.sy(o.y) + bob;
+      const sway = Math.sin(now * 1.1 + o.id * 2) * (o.kind === 'balloon' ? 3 : 2);
+      img.setPosition(px + sway, py);
+      img.setRotation(sway * 0.01);
+      gs.lineStyle(o.kind === 'balloon' ? 2 : 2, o.kind === 'balloon' ? 0x8f99a3 : 0xe8edf1, o.kind === 'balloon' ? 0.9 : 0.8);
+      if (o.kind === 'balloon') gs.lineBetween(px + sway, py + o.r * PX * 0.75, px + sway * 0.3, 48);
+      else gs.lineBetween(px + sway, py - o.r * PX * 0.6, px, 48);
+    }
+    for (const [id, img] of this.softSprites) {
+      if (!live.has(id)) {
+        img.destroy();
+        this.softSprites.delete(id);
+      }
+    }
+  }
+
   /** Floor props: sprites for objects, plain blocks for stair treads. Created and destroyed as the level scrolls. */
   private syncProps(): void {
     const view = this.view;
@@ -482,6 +544,7 @@ export class GameScene extends Phaser.Scene {
     this.updateCameraLayers();
 
     this.syncProps();
+    this.syncSofts();
     g.clear();
 
     // Hanging pendulums (lamps and meat): cord, body, light cone for lamps.
