@@ -78,3 +78,7 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 - Balloons (+30) and cobwebs (+15) in the endless generator; no water cost.
 - Lamps break when the knock impulse exceeds lampBreakImpulse 2.6 (-12 water, no life); darkness with flashlight glow until the next intact lamp within 4.5 we.
 - Art: meat (marbling, bone, hook), curvier banana with stem, clearer tyre. Banana slip window left at core +-0.3 (jump test passes).
+
+## Round: bucket knocks
+- Auto-lift over props removed (only floor/stairs lift); bucket touching a prop = bucketBonk (ladder shock, swing, -3 water, bonk).
+- Cleaver (knife, 0.3 high) under ~55% of hanging meat; banana thicker; bone sticks out higher.

@@ -87,6 +87,7 @@ export class GameScene extends Phaser.Scene {
     this.load.svg('pail', 'art/pail.svg', { width: 80, height: 45 });
     this.load.svg('tyre', 'art/tyre.svg', { width: 100, height: 40 });
     this.load.svg('cheese', 'art/cheese.svg', { width: 100, height: 30 });
+    this.load.svg('knife', 'art/knife.svg', { width: 100, height: 30 });
     this.load.svg('meat', 'art/meat.svg', { width: 100, height: 120 });
     this.load.svg('balloon', 'art/balloon.svg', { width: 60, height: 80 });
     this.load.svg('web', 'art/web.svg', { width: 100, height: 100 });
@@ -392,6 +393,13 @@ export class GameScene extends Phaser.Scene {
           if (e.type === 'lampHit') this.floatText(sx, sy - 10, STRINGS.oof, '#ffd36b');
           break;
         }
+        case 'bucketBonk':
+          sfx.bonk();
+          sfx.splash(4);
+          this.splashAt(14);
+          this.shake = 0.2;
+          this.speech.say(this.nearestPlayer(e.x), 'Careful!', 'hint');
+          break;
         case 'lampBreak':
           sfx.glassBreak();
           sfx.splash(e.value ?? 8);

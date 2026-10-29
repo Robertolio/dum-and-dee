@@ -118,3 +118,27 @@ export function integrateSofts(s: GameState, t: Tuning): void {
     s.events.push({ tick: s.tick, type: o.kind === 'balloon' ? 'pop' : 'sweep', value: pts, x: o.x, y: o.y });
   }
 }
+
+/** The hanging bucket is not lifted over props: touching one is a knock (swing, ladder shock, water). */
+export function integrateBucketHits(s: GameState, t: Tuning): void {
+  if (s.bucketCd > 0) s.bucketCd = Math.max(0, s.bucketCd - t.dt);
+  const B = s.bucket;
+  const bx = B.xP + t.bucketL * Math.sin(B.phi);
+  const bottom = B.yP - t.bucketL * Math.cos(B.phi) - t.bucketBody;
+  for (const o of s.steps) {
+    if (o.kind === 'stair' || o.hObj < 0.12) continue;
+    if (o.x1 < bx - t.bucketHalfW || o.x0 > bx + t.bucketHalfW) continue;
+    if (bottom >= o.hObj - 0.02) continue;
+    if (s.bucketCd > 0) return;
+    s.bucketCd = 0.45;
+    const fromAbove = bottom > o.hObj - 0.14;
+    const dir = bx < (o.x0 + o.x1) / 2 ? -1 : 1;
+    const strength = Math.max(1, Math.abs(B.vPx) + 1);
+    if (fromAbove) applyLadderImpulse(s, 0, t.bucketBonkImpulse * 0.8, t);
+    else applyLadderImpulse(s, dir * t.bucketBonkImpulse, t.bucketBonkImpulse * 0.4, t);
+    B.phiDot += dir * 2.2;
+    loseWater(s, t.bucketBonkSplash);
+    s.events.push({ tick: s.tick, type: 'bucketBonk', value: strength, x: bx, y: Math.max(bottom, 0) });
+    return;
+  }
+}

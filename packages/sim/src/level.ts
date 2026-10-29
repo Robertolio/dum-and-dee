@@ -41,6 +41,7 @@ export const STEP_HEIGHT: Record<StepKind, number> = {
   pail: 0.45,
   tyre: 0.4,
   cheese: 0.3,
+  knife: 0.3,
   stair: 0.2,
 };
 
@@ -54,6 +55,7 @@ export const STEP_WIDTH: Record<StepKind, number> = {
   pail: 0.8,
   tyre: 1.0,
   cheese: 1.0,
+  knife: 1.0,
   stair: 0.7,
 };
 
@@ -67,6 +69,7 @@ export const STEP_MASS: Record<StepKind, number> = {
   pail: 0.5,
   tyre: 0.8,
   cheese: 0.7,
+  knife: 0.6,
   stair: 99,
 };
 
@@ -184,7 +187,7 @@ function swingState(amp: number, phase: number, len: number, t: Tuning): [number
   return [amp * Math.cos(phase), -amp * w * Math.sin(phase)];
 }
 
-function addMeatSeries(s: { lamps: LampState[] }, g: GenState, t: Tuning, x: number, d: number): number {
+function addMeatSeries(s: { lamps: LampState[]; steps: StepObstacle[] }, g: GenState, t: Tuning, x: number, d: number): number {
   const n = 2 + Math.floor(rand(g) * (1 + d * 3)) + (d > 0.5 ? 1 : 0);
   const spacing = lerp(2.7, 2.15, d) + rand(g) * 0.3;
   const amp = lerp(t.meatAmpMin, t.meatAmpMax, rand(g) * 0.5 + d * 0.5);
@@ -193,6 +196,7 @@ function addMeatSeries(s: { lamps: LampState[] }, g: GenState, t: Tuning, x: num
   for (let i = 0; i < n; i++) {
     const [psi, psiDot] = swingState(amp, phase0 + i * dphase, t.meatL, t);
     addLamp(s, g, t, x + i * spacing, 'meat', psi, psiDot);
+    if (rand(g) < 0.55) addStep(s, g, x + i * spacing - STEP_WIDTH.knife / 2, 'knife');
   }
   return (n - 1) * spacing + 1;
 }
@@ -272,6 +276,7 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
     if (rand(g) < 0.5 + d * 0.3) {
       const [psi, psiDot] = swingState(lerp(t.meatAmpMin, t.meatAmpMax, rand(g)), rand(g) * 6.28, t.meatL, t);
       addLamp(s, g, t, x + gap, 'meat', psi, psiDot);
+      addStep(s, g, x + gap - STEP_WIDTH.knife / 2, 'knife');
     } else addLamp(s, g, t, x + gap, 'lamp');
     return gap + 1.2;
   }

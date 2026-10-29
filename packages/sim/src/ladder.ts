@@ -115,7 +115,7 @@ export function integrateVertical(s: GameState, t: Tuning): void {
   for (const o of s.steps) {
     const ahead = Math.max(0, s.bucket.vPx) * 0.25;
     if (o.x1 < bx - t.bucketHalfW || o.x0 > bx + t.bucketHalfW + ahead) continue;
-    if (o.hObj > ground) ground = o.hObj;
+    if (o.kind === 'stair' && o.hObj > ground) ground = o.hObj;
   }
   const midY = (yA + yB) / 2;
   const needed = ground + t.bucketL * Math.cos(s.bucket.phi) + t.bucketBody + 0.02;

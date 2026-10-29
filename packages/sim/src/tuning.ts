@@ -107,6 +107,8 @@ export interface Tuning {
   bucketBody: number;
   bucketHalfW: number;
   liftUp: number;
+  bucketBonkImpulse: number;
+  bucketBonkSplash: number;
   liftDown: number;
 
   // --- Water loss ---
@@ -220,6 +222,8 @@ export const DEFAULT_TUNING: Tuning = {
   bucketBody: 0.48,
   bucketHalfW: 0.25,
   liftUp: 8,
+  bucketBonkImpulse: 1.6,
+  bucketBonkSplash: 3,
   liftDown: 2,
 
   phiSafeDeg: 15,

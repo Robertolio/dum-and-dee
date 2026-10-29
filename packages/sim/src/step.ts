@@ -8,7 +8,7 @@ import { integrateHorizontal, integrateVertical, resetPlayerRow, yHand } from '.
 import { evaluateStepCatch, integrateStepUps, updateStepTargets } from './stepup';
 import { integrateBucket, primeBucket } from './bucket';
 import { integrateLamps } from './lamp';
-import { integrateBeams, integrateSofts, integrateJump, resolveObstacles } from './obstacles';
+import { integrateBucketHits, integrateBeams, integrateSofts, integrateJump, resolveObstacles } from './obstacles';
 import { buildBeams, buildSofts, buildLamps, buildSteps, createGen, ENDLESS_LEVEL, extendLevel, type LevelData } from './level';
 
 export function createPlayer(x: number, t: Tuning): PlayerState {
@@ -84,6 +84,7 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
     beams: buildBeams(level),
     softs: buildSofts(level),
     dark: false,
+    bucketCd: 0,
     darkFromX: 0,
     gen: null,
     balance: 0,
@@ -192,6 +193,7 @@ export function step(s: GameState, inputs: readonly [PlayerInput, PlayerInput], 
   integrateBeams(s, t);
   integrateSofts(s, t);
   integrateBucket(s, t);
+  integrateBucketHits(s, t);
   evaluateStepCatch(s, t);
   updateBalance(s, t);
   updateWaterAndLives(s, t);

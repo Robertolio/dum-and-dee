@@ -12,7 +12,8 @@
     <path d="M24 52 C28 60 30 64 34 66" stroke-width="2.5"/>
   </g>
   <path d="M30 22 C34 40 28 60 24 64" fill="none" stroke="#e86a74" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
-  <rect x="62" y="44" width="34" height="9" rx="4.5" transform="rotate(32 62 44)" fill="#f6efe0" stroke="#a89878" stroke-width="2.5"/>
-  <circle cx="89" cy="62" r="6.5" fill="#f6efe0" stroke="#a89878" stroke-width="2.5"/>
-  <circle cx="82" cy="72" r="6" fill="#f6efe0" stroke="#a89878" stroke-width="2.5"/>
+  <path d="M70 42 L88 12" stroke="#a89878" stroke-width="11" stroke-linecap="round"/>
+  <path d="M70 42 L88 12" stroke="#f6efe0" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="85" cy="7" r="6.5" fill="#f6efe0" stroke="#a89878" stroke-width="2.5"/>
+  <circle cx="94" cy="14" r="6" fill="#f6efe0" stroke="#a89878" stroke-width="2.5"/>
 </svg>
