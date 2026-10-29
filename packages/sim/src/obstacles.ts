@@ -2,6 +2,7 @@ import type { GameState, PlayerId, PlayerState, StepObstacle } from './state';
 import type { Tuning } from './tuning';
 import { applyLadderImpulse, ladderSegment } from './ladder';
 import { loseWater } from './bucket';
+import { closestOnSegment } from './collision';
 
 /** True when the object is too high for this player to simply walk onto, and the player is on its approach side. */
 export function blocksPlayer(p: PlayerState, o: StepObstacle, t: Tuning): boolean {
@@ -100,5 +101,20 @@ export function integrateBeams(s: GameState, t: Tuning): void {
       applyLadderImpulse(s, -0.5, -1.0, t);
       s.events.push({ tick: s.tick, type: 'beamHit', value: t.beamSplash, x: Math.max(b.x0, Math.min(b.x1, seg.bx)), y: b.yBottom });
     }
+  }
+}
+
+/** Balloons pop and cobwebs are swept away when the ladder touches them: points, no water, no impact. */
+export function integrateSofts(s: GameState, t: Tuning): void {
+  if (s.softs.length === 0) return;
+  const seg = ladderSegment(s, t);
+  for (const o of s.softs) {
+    if (o.done || o.x < seg.ax - 1 || o.x > seg.bx + 1) continue;
+    const hit = closestOnSegment(seg.ax, seg.ay, seg.bx, seg.by, o.x, o.y);
+    if (hit.dist >= o.r + t.ladderThickness / 2) continue;
+    o.done = true;
+    const pts = o.kind === 'balloon' ? t.scoreBalloon : t.scoreWeb;
+    s.score += pts;
+    s.events.push({ tick: s.tick, type: o.kind === 'balloon' ? 'pop' : 'sweep', value: pts, x: o.x, y: o.y });
   }
 }

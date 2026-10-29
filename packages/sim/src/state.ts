@@ -110,6 +110,18 @@ export interface StepObstacle {
   used: boolean;
 }
 
+/** Things the ladder simply passes through: balloons are popped, cobwebs are swept away. */
+export interface SoftObstacle {
+  id: number;
+  kind: 'balloon' | 'web';
+  x: number;
+  y: number;
+  r: number;
+  /** Colour index for balloons. */
+  color: number;
+  done: boolean;
+}
+
 export interface BeamObstacle {
   id: number;
   x0: number;
@@ -126,6 +138,8 @@ export type GameEventType =
   | 'stepCaught'
   | 'stepMissed'
   | 'bucketEmpty'
+  | 'pop'
+  | 'sweep'
   | 'slip'
   | 'bump'
   | 'push'
@@ -148,6 +162,7 @@ export interface GenState {
   nextLampId: number;
   nextStepId: number;
   nextBeamId: number;
+  nextSoftId: number;
   patterns: number;
 }
 
@@ -160,6 +175,7 @@ export interface GameState {
   lamps: LampState[];
   steps: StepObstacle[];
   beams: BeamObstacle[];
+  softs: SoftObstacle[];
   /** Procedural level generator (null for fixed levels). */
   gen: GenState | null;
   balance: number;

@@ -8,8 +8,8 @@ import { integrateHorizontal, integrateVertical, resetPlayerRow, yHand } from '.
 import { evaluateStepCatch, integrateStepUps, updateStepTargets } from './stepup';
 import { integrateBucket, primeBucket } from './bucket';
 import { integrateLamps } from './lamp';
-import { integrateBeams, integrateJump, resolveObstacles } from './obstacles';
-import { buildBeams, buildLamps, buildSteps, createGen, ENDLESS_LEVEL, extendLevel, type LevelData } from './level';
+import { integrateBeams, integrateSofts, integrateJump, resolveObstacles } from './obstacles';
+import { buildBeams, buildSofts, buildLamps, buildSteps, createGen, ENDLESS_LEVEL, extendLevel, type LevelData } from './level';
 
 export function createPlayer(x: number, t: Tuning): PlayerState {
   const h = t.hUpright;
@@ -82,6 +82,7 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
     lamps: buildLamps(level, t),
     steps: buildSteps(level),
     beams: buildBeams(level),
+    softs: buildSofts(level),
     gen: null,
     balance: 0,
     balanceTimer: 0,
@@ -91,7 +92,7 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
     gameOver: false,
     events: [],
   };
-  s.gen = createGen(level, s.lamps.length, s.steps.length, s.beams.length);
+  s.gen = createGen(level, s.lamps.length, s.steps.length, s.beams.length, s.softs.length);
   extendLevel(s, startX, t);
   primeBucket(s);
   return s;
@@ -187,6 +188,7 @@ export function step(s: GameState, inputs: readonly [PlayerInput, PlayerInput], 
   integrateVertical(s, t);
   integrateLamps(s, t);
   integrateBeams(s, t);
+  integrateSofts(s, t);
   integrateBucket(s, t);
   evaluateStepCatch(s, t);
   updateBalance(s, t);

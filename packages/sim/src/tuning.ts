@@ -149,6 +149,8 @@ export interface Tuning {
   scoreDistance: number;
   scoreLampClean: number;
   scoreStepCaught: number;
+  scoreBalloon: number;
+  scoreWeb: number;
   startLives: number;
 }
 
@@ -247,6 +249,8 @@ export const DEFAULT_TUNING: Tuning = {
   scoreDistance: 1,
   scoreLampClean: 100,
   scoreStepCaught: 50,
+  scoreBalloon: 30,
+  scoreWeb: 15,
   startLives: 3,
 };
 

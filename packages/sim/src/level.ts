@@ -1,4 +1,4 @@
-import type { BeamObstacle, GenState, LampKind, LampState, StepObstacle, StepKind } from './state';
+import type { BeamObstacle, SoftObstacle, GenState, LampKind, LampState, StepObstacle, StepKind } from './state';
 import type { Tuning } from './tuning';
 
 export interface LevelLamp {
@@ -25,6 +25,7 @@ export interface LevelData {
   lamps: LevelLamp[];
   steps: LevelStep[];
   beams?: { x0: number; x1: number; yBottom: number }[];
+  softs?: { kind: 'balloon' | 'web'; x: number; y: number; r?: number; color?: number }[];
   /** Length of the hall in we (decorative). */
   length: number;
   /** Endless procedural generation ahead of the ladder. */
@@ -128,13 +129,17 @@ export function buildSteps(level: LevelData): StepObstacle[] {
   return level.steps.map((s, i) => makeStep(i, s.x, s.x + s.width, s.height ?? STEP_HEIGHT[s.kind], s.kind));
 }
 
+export function buildSofts(level: LevelData): SoftObstacle[] {
+  return (level.softs ?? []).map((o, i) => ({ id: i, kind: o.kind, x: o.x, y: o.y, r: o.r ?? (o.kind === 'balloon' ? 0.38 : 0.5), color: o.color ?? 0, done: false }));
+}
+
 export function buildBeams(level: LevelData): BeamObstacle[] {
   return (level.beams ?? []).map((b, i) => ({ id: i, x0: b.x0, x1: b.x1, yBottom: b.yBottom, cooldown: 0 }));
 }
 
 // --- Procedural generation -------------------------------------------------
 
-export function createGen(level: LevelData, existingLamps: number, existingSteps: number, existingBeams = 0): GenState | null {
+export function createGen(level: LevelData, existingLamps: number, existingSteps: number, existingBeams = 0, existingSofts = 0): GenState | null {
   if (!level.generator) return null;
   return {
     rng: level.generator.seed >>> 0,
@@ -142,6 +147,7 @@ export function createGen(level: LevelData, existingLamps: number, existingSteps
     nextLampId: existingLamps,
     nextStepId: existingSteps,
     nextBeamId: existingBeams,
+    nextSoftId: existingSofts,
     patterns: 0,
   };
 }
@@ -212,11 +218,29 @@ function addStairs(s: { steps: StepObstacle[]; beams: BeamObstacle[] }, g: GenSt
   return cx - x;
 }
 
+function addBalloons(s: { softs: SoftObstacle[] }, g: GenState, x: number, d: number): number {
+  const n = 2 + Math.floor(rand(g) * 3);
+  let cx = x;
+  for (let i = 0; i < n; i++) {
+    s.softs.push({ id: g.nextSoftId++, kind: 'balloon', x: cx, y: 1.7 + rand(g) * 1.0, r: 0.36 + rand(g) * 0.1, color: Math.floor(rand(g) * 6), done: false });
+    cx += 1.1 + rand(g) * 0.9;
+  }
+  void d;
+  return cx - x;
+}
+
+function addWebs(s: { softs: SoftObstacle[] }, g: GenState, x: number): number {
+  const n = rand(g) < 0.35 ? 2 : 1;
+  for (let i = 0; i < n; i++) s.softs.push({ id: g.nextSoftId++, kind: 'web', x: x + i * 2.6, y: 1.55 + rand(g) * 0.5, r: 0.5 + rand(g) * 0.12, color: 0, done: false });
+  return (n - 1) * 2.6 + 1;
+}
+
 /** Emit one obstacle pattern at g.nextX and return its length. */
-function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: BeamObstacle[] }, g: GenState, t: Tuning): number {
+function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: BeamObstacle[]; softs: SoftObstacle[] }, g: GenState, t: Tuning): number {
   const x = g.nextX;
   const d = difficultyAt(x);
   const r = rand(g);
+  const r2 = rand(g);
   g.patterns += 1;
   // The first few patterns are gentle: single obstacles.
   if (g.patterns <= 2) {
@@ -224,6 +248,8 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
     else addStep(s, g, x, pick(g, ['crate', 'banana', 'duck', 'pail'] as const));
     return 1;
   }
+  if (r2 < 0.12) return addBalloons(s, g, x, d);
+  if (r2 < 0.2) return addWebs(s, g, x);
   if (r < 0.26) {
     addStep(s, g, x, pick(g, FLOOR_KINDS));
     return 1.2;
@@ -262,7 +288,7 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
 }
 
 /** Keep generating until `horizon` we ahead of the ladder; drop obstacles far behind it. */
-export function extendLevel(s: { gen: GenState | null; steps: StepObstacle[]; lamps: LampState[]; beams: BeamObstacle[] }, ladderX: number, t: Tuning, horizon = 36): void {
+export function extendLevel(s: { gen: GenState | null; steps: StepObstacle[]; lamps: LampState[]; beams: BeamObstacle[]; softs: SoftObstacle[] }, ladderX: number, t: Tuning, horizon = 36): void {
   const g = s.gen;
   if (!g) return;
   while (g.nextX < ladderX + horizon) {
@@ -272,6 +298,7 @@ export function extendLevel(s: { gen: GenState | null; steps: StepObstacle[]; la
   }
   const keep = ladderX - 14;
   if (s.steps.length > 0 && s.steps[0]!.x1 < keep) s.steps = s.steps.filter((o) => o.x1 >= keep);
+  if (s.softs.length > 0 && s.softs[0]!.x < keep) s.softs = s.softs.filter((o) => o.x >= keep);
   if (s.beams.length > 0 && s.beams[0]!.x1 < keep) s.beams = s.beams.filter((b) => b.x1 >= keep);
   if (s.lamps.length > 0 && s.lamps[0]!.x < keep) s.lamps = s.lamps.filter((l) => l.x >= keep);
 }
