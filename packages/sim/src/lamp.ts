@@ -15,6 +15,17 @@ export function integrateLamps(s: GameState, t: Tuning): void {
   const seg = ladderSegment(s, t);
   const [a, b] = s.players;
 
+  const midX = (a.x + b.x) / 2;
+  if (s.dark) {
+    for (const l of s.lamps) {
+      if (l.kind === 'lamp' && !l.broken && l.x > s.darkFromX && Math.abs(l.x - midX) < t.lampLightRange) {
+        s.dark = false;
+        s.events.push({ tick: s.tick, type: 'lightsOn', x: l.x });
+        break;
+      }
+    }
+  }
+
   for (const l of s.lamps) {
     const psiDDot = -(t.g / l.len) * Math.sin(l.psi) - l.damp * l.psiDot;
     l.psiDot += psiDDot * dt;
@@ -57,11 +68,20 @@ export function integrateLamps(s: GameState, t: Tuning): void {
         l.psiDot += (J * tangential) / (l.mass * l.len);
         applyLadderImpulse(s, -J * hit.nx, -J * hit.ny, t);
 
+        if (l.kind === 'lamp' && !l.broken && J > t.lampBreakImpulse) {
+          l.broken = true;
+          s.dark = true;
+          s.darkFromX = l.x;
+          loseWater(s, t.lampBreakSplash);
+          s.events.push({ tick: s.tick, type: 'lampBreak', value: t.lampBreakSplash, x: cap.x, y: cap.y });
+        }
         l.hits += 1;
         l.cooldown = t.lampTickCooldown;
-        const splash = first ? t.lampFirstSplash : t.lampTickSplash;
-        loseWater(s, splash);
-        s.events.push({ tick: s.tick, type: first ? 'lampHit' : 'lampTick', value: splash, x: cap.x, y: cap.y });
+        if (!l.broken || !first) {
+          const splash = first ? t.lampFirstSplash : t.lampTickSplash;
+          loseWater(s, splash);
+          s.events.push({ tick: s.tick, type: first ? 'lampHit' : 'lampTick', value: splash, x: cap.x, y: cap.y });
+        }
       } else {
         // Resting/sliding contact: the cap rides on the ladder, no new splash.
         const tn = tx * hit.nx + ty * hit.ny;

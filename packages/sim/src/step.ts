@@ -83,6 +83,8 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
     steps: buildSteps(level),
     beams: buildBeams(level),
     softs: buildSofts(level),
+    dark: false,
+    darkFromX: 0,
     gen: null,
     balance: 0,
     balanceTimer: 0,

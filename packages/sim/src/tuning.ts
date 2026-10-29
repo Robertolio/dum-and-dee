@@ -131,6 +131,10 @@ export interface Tuning {
   lampTickSplash: number;
   /** Relative speed assumed for a first contact at least (so a graze counts). */
   lampMinRelVel: number;
+  /** Impulse on a lamp above which it breaks. */
+  lampBreakImpulse: number;
+  lampBreakSplash: number;
+  lampLightRange: number;
   /** Minimum approach speed for a follow-up tick; slower contact is sliding and costs nothing. */
   lampTickMinVel: number;
   /** Fraction of the normal impulse converted to lamp swing even for a straight-up hit. */
@@ -236,6 +240,9 @@ export const DEFAULT_TUNING: Tuning = {
   lampFirstSplash: 8,
   lampTickSplash: 4,
   lampMinRelVel: 1.0,
+  lampBreakImpulse: 2.6,
+  lampBreakSplash: 12,
+  lampLightRange: 4.5,
   lampTickMinVel: 0.6,
   lampSwingBias: 0.6,
 

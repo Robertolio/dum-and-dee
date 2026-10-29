@@ -370,6 +370,22 @@ class Sfx {
     this.tone('triangle', 1500, 400, 0.04, 0.12);
   }
 
+  /** Lamp bulb breaking: bang, glass shards, electric fizz. */
+  glassBreak(): void {
+    if (!this.ready()) return;
+    this.burst('lowpass', 900, 0.7, 0.12, 0.5);
+    this.tone('triangle', 220, 50, 0.16, 0.4);
+    this.shaped('highpass', 3500, 0.8, 0.35, 0.35, 0.002, 0);
+    for (let i = 0; i < 5; i++) this.tone('sine', 2400 + Math.random() * 3200, 1800, 0.05, 0.1, 0.04 + i * 0.045 + Math.random() * 0.03);
+    this.shaped('bandpass', 5200, 1.5, 0.28, 0.12, 0.1, 0, 2200);
+  }
+
+  lightsOn(): void {
+    if (!this.ready()) return;
+    this.tone('square', 300, 300, 0.03, 0.08);
+    this.tone('sine', 520, 880, 0.12, 0.12, 0.05);
+  }
+
   /** Soft "fwip" when a cobweb is swept away. */
   fwip(): void {
     if (!this.ready()) return;

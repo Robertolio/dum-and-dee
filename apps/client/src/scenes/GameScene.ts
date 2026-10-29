@@ -113,6 +113,17 @@ export class GameScene extends Phaser.Scene {
     this.gWorld = this.add.graphics().setDepth(10);
     this.gFx = this.add.graphics().setDepth(10.9);
     this.gThumbs = this.add.graphics().setDepth(60);
+    const gt = this.textures.createCanvas('glow', 256, 256)!;
+    const gc = gt.getContext();
+    const grad = gc.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.45, 'rgba(255,255,255,0.75)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    gc.fillStyle = grad;
+    gc.fillRect(0, 0, 256, 256);
+    gt.refresh();
+    this.darkGlow = this.make.image({ key: 'glow', add: false });
+    this.darkRT = this.add.renderTexture(0, 0, W, GAME_H).setOrigin(0, 0).setDepth(14).setVisible(false);
 
     // Particles.
     const dot = this.make.graphics({ x: 0, y: 0 }, false);
@@ -185,6 +196,39 @@ export class GameScene extends Phaser.Scene {
     this.updateCameraLayers();
   }
 
+  private updateDark(s: GameState): void {
+    const target = s.dark && !s.gameOver ? 1 : 0;
+    this.darkA += (target - this.darkA) * Math.min(1, this.lastDt * (target > this.darkA ? 6 : 3));
+    if (!this.darkRT) return;
+    if (this.darkA < 0.01) {
+      this.darkRT.setVisible(false);
+      return;
+    }
+    const W = this.scale.width;
+    if (this.darkRT.width !== W) this.darkRT.resize(W, GAME_H);
+    this.darkRT.setVisible(true);
+    this.darkRT.clear();
+    this.darkRT.fill(0x04060c, this.darkA * 0.9);
+    const glow = this.darkGlow!;
+    const pulse = 1 + Math.sin(performance.now() / 180) * 0.03;
+    const [a, b] = s.players;
+    const view = this.view;
+    const spots: Array<[number, number, number]> = [
+      [view.sx(a.x), view.sy(a.y + 0.9), 2.3],
+      [view.sx(b.x), view.sy(b.y + 0.9), 2.3],
+      [view.sx((a.x + b.x) / 2), view.sy(Math.max(a.y, b.y) + 1.4), 2.6],
+      [view.sx(s.bucket.xP), FLOOR_Y - 120, 1.4],
+    ];
+    for (const [x, y, k] of spots) {
+      glow.setScale((k * pulse * this.darkA + k * (1 - this.darkA)) * 0.5);
+      this.darkRT.erase(glow, x, y);
+    }
+  }
+
+  private darkA = 0;
+  private darkRT?: Phaser.GameObjects.RenderTexture;
+  private darkGlow?: Phaser.GameObjects.Image;
+
   private resetWalk(): void {
     this.walk = [createWalkAnim(this.state.players[0].x), createWalkAnim(this.state.players[1].x)];
   }
@@ -196,6 +240,7 @@ export class GameScene extends Phaser.Scene {
     this.accumulator = 0;
     this.speech.reset();
     this.seenAhead.clear();
+    this.darkA = 0;
     this.waterWarned = false;
     this.oof = [0, 0];
     this.overlay?.destroy();
@@ -347,6 +392,19 @@ export class GameScene extends Phaser.Scene {
           if (e.type === 'lampHit') this.floatText(sx, sy - 10, STRINGS.oof, '#ffd36b');
           break;
         }
+        case 'lampBreak':
+          sfx.glassBreak();
+          sfx.splash(e.value ?? 8);
+          this.sparks.explode(40, sx, sy + 20);
+          this.splashAt(16);
+          this.shake = 0.35;
+          this.oof = [0.6, 0.6];
+          this.speech.say(this.nearestPlayer(e.x), Math.random() < 0.5 ? 'Whoa!' : 'Oops!', 'hint');
+          break;
+        case 'lightsOn':
+          sfx.lightsOn();
+          this.speech.say(null, 'Nice!', 'cheer');
+          break;
         case 'pop':
           sfx.pop();
           this.confetti.explode(34, sx, sy);
@@ -571,6 +629,11 @@ export class GameScene extends Phaser.Scene {
         this.lampSprites.set(l.id, img);
       }
       img.setPosition(topX, topY).setRotation(-l.psi);
+      if (!meat && l.broken) {
+        img.setTint(0x555a60);
+        if (Math.random() < 0.08) this.sparks.explode(2, cx, cy + 14);
+        continue;
+      }
       if (meat) continue;
       const clearance = ladderHeightAt(s, l.x) + t.ladderThickness / 2 < cap.y - l.radius;
       const near = Math.abs(l.x - (s.players[0].x + s.players[1].x) / 2) < 6;
@@ -604,6 +667,8 @@ export class GameScene extends Phaser.Scene {
         this.lampSprites.delete(id);
       }
     }
+
+    this.updateDark(s);
 
     // Figures.
     const [a, b] = s.players;

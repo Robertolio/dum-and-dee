@@ -93,6 +93,7 @@ export interface LampState {
   cooldown: number;
   hits: number;
   passed: boolean;
+  broken: boolean;
 }
 
 export type StepKind = 'bracket' | 'crate' | 'pallet' | 'banana' | 'duck' | 'pail' | 'tyre' | 'cheese' | 'stair';
@@ -135,6 +136,8 @@ export type GameEventType =
   | 'lampHit'
   | 'lampTick'
   | 'lampClean'
+  | 'lampBreak'
+  | 'lightsOn'
   | 'stepCaught'
   | 'stepMissed'
   | 'bucketEmpty'
@@ -176,6 +179,9 @@ export interface GameState {
   steps: StepObstacle[];
   beams: BeamObstacle[];
   softs: SoftObstacle[];
+  /** Darkness after a lamp broke: lights return near the next intact lamp. */
+  dark: boolean;
+  darkFromX: number;
   /** Procedural level generator (null for fixed levels). */
   gen: GenState | null;
   balance: number;

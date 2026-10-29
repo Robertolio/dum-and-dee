@@ -118,6 +118,7 @@ export function makeLamp(id: number, x: number, kind: LampKind, t: Tuning, psi =
     cooldown: 0,
     hits: 0,
     passed: false,
+    broken: false,
   };
 }
 
