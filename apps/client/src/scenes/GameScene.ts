@@ -107,7 +107,7 @@ export class GameScene extends Phaser.Scene {
     this.bucketSprite = this.add.image(0, 0, 'bucket').setOrigin(0.5, 0.04).setDepth(11);
 
     this.gWorld = this.add.graphics().setDepth(10);
-    this.gFx = this.add.graphics().setDepth(11.5);
+    this.gFx = this.add.graphics().setDepth(10.9);
     this.gThumbs = this.add.graphics().setDepth(60);
 
     // Particles.
@@ -572,9 +572,10 @@ export class GameScene extends Phaser.Scene {
     const fill = B.water / 100;
     const fx = this.gFx;
     fx.clear();
-    const bucketW = 30;
-    const bucketTop = 10;
-    const bucketH = 26;
+    const topHalf = 16;
+    const botHalf = 12;
+    const bucketTop = 19;
+    const bucketH = 25;
     const theta = -B.phi;
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
@@ -582,10 +583,10 @@ export class GameScene extends Phaser.Scene {
     const surface = bucketTop + bucketH * (1 - fill);
     const up: [number, number] = [-sin, -cos];
     let poly: [number, number][] = [
-      [-bucketW / 2 + 1, bucketTop],
-      [bucketW / 2 - 1, bucketTop],
-      [bucketW / 2 - 3, bucketTop + bucketH],
-      [-bucketW / 2 + 3, bucketTop + bucketH],
+      [-topHalf, bucketTop],
+      [topHalf, bucketTop],
+      [botHalf, bucketTop + bucketH],
+      [-botHalf, bucketTop + bucketH],
     ];
     const side = (p: [number, number]): number => (p[0] * up[0] + (p[1] - surface) * up[1]);
     const clipped: [number, number][] = [];

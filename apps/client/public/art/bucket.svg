@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="52" viewBox="0 0 48 52">
-  <!-- handle apex at (24,2), body below -->
+  <!-- handle apex at (24,2); the water is drawn behind this sprite, inside the translucent body -->
   <path d="M6 16 Q24 -6 42 16" fill="none" stroke="#3b4248" stroke-width="3"/>
-  <path d="M4 16 L10 50 L38 50 L44 16 Z" fill="#b9c1c9" stroke="#3b4248" stroke-width="3" stroke-linejoin="round"/>
-  <path d="M8 22 L12 46 L36 46 L40 22 Z" fill="#3aa7ef"/>
-  <rect x="4" y="14" width="40" height="6" rx="2" fill="#d8dee4" stroke="#3b4248" stroke-width="2"/>
-  <path d="M12 26 L14 42" stroke="#9fdcff" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+  <path d="M4 16 L10 50 L38 50 L44 16 Z" fill="#dfe6ec" fill-opacity="0.28" stroke="#3b4248" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M10 50 L38 50 L37 46 L11 46 Z" fill="#9aa4ad" stroke="#3b4248" stroke-width="2" stroke-linejoin="round"/>
+  <rect x="3" y="13" width="42" height="7" rx="3" fill="#eef2f5" stroke="#3b4248" stroke-width="2"/>
+  <path d="M12 26 L14 40" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
 </svg>
