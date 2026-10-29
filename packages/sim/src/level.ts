@@ -204,7 +204,7 @@ function addStairs(s: { steps: StepObstacle[]; beams: BeamObstacle[] }, g: GenSt
   addStep(s, g, cx, 'stair', rise * n, top);
   cx += top;
   // Low ceiling beam above the stairs: only passable bent through the knees.
-  s.beams.push({ id: g.nextBeamId++, x0: plateau0 - 1.2, x1: cx - 0.2, yBottom: rise * n + 1.5, cooldown: 0 });
+  s.beams.push({ id: g.nextBeamId++, x0: plateau0 - 1.2, x1: cx - 0.2, yBottom: rise * n + 1.75, cooldown: 0 });
   for (let i = n - 1; i >= 1; i--) {
     addStep(s, g, cx, 'stair', rise * i, w);
     cx += w;
