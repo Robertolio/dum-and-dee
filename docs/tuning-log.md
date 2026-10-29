@@ -70,3 +70,11 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 - Ladder overhang 1.2 → 1.52 we (one rung spacing, 0.32 we, more at each end); ladder length 7.24 we.
 - Water audio is now cartoon-like: sine "bloop" bubbles with rising pitch, drip plinks, short high-passed sploosh; the continuous slosh is a very quiet airy hiss with sparse gurgles.
 - Lamp light cone and glow rotate with the lamp's swing (axis follows the cord direction).
+
+## Round: bucket clamp, water z-order, balloons/webs, broken lamps, art
+
+- Bucket is lifted with the ladder over obstacles/stairs and never sinks below the floor (liftUp 8, liftDown 2); stair beams raised to rise*n+1.75.
+- Bucket art is translucent with water drawn behind the rim (no blue block).
+- Balloons (+30) and cobwebs (+15) in the endless generator; no water cost.
+- Lamps break when the knock impulse exceeds lampBreakImpulse 2.6 (-12 water, no life); darkness with flashlight glow until the next intact lamp within 4.5 we.
+- Art: meat (marbling, bone, hook), curvier banana with stem, clearer tyre. Banana slip window left at core +-0.3 (jump test passes).
