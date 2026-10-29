@@ -44,6 +44,8 @@ export interface LadderState {
   kickY: number;
   kickVX: number;
   kickVY: number;
+  /** Extra lift (we) applied to both hands so the bucket never touches the floor or an obstacle. */
+  lift: number;
   theta: number;
   thetaDot: number;
   /** Arm-reach excess (we), 0 when within reach. */

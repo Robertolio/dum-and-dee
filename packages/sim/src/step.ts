@@ -56,6 +56,7 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
       kickY: 0,
       kickVX: 0,
       kickVY: 0,
+      lift: 0,
       theta: 0,
       thetaDot: 0,
       over: 0,

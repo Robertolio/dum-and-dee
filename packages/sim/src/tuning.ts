@@ -103,6 +103,11 @@ export interface Tuning {
   bucketL: number;
   bucketD: number;
   bucketCTheta: number;
+  /** Height of the bucket body below its rope end (we), half its width, and how fast the ladder is lifted/lowered to keep it off the ground (we/s). */
+  bucketBody: number;
+  bucketHalfW: number;
+  liftUp: number;
+  liftDown: number;
 
   // --- Water loss ---
   phiSafeDeg: number;
@@ -206,6 +211,10 @@ export const DEFAULT_TUNING: Tuning = {
   bucketL: 0.5,
   bucketD: 1.5,
   bucketCTheta: 0.15,
+  bucketBody: 0.48,
+  bucketHalfW: 0.25,
+  liftUp: 8,
+  liftDown: 2,
 
   phiSafeDeg: 15,
   kPhi: 0.12,
