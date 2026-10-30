@@ -5,7 +5,8 @@ import {
   DEFAULT_TUNING,
   lampCapCenter,
   ladderHeightAt,
-  ENDLESS_LEVEL,
+  levelById,
+  type LevelDef,
   advanceWalk,
   createWalkAnim,
   type WalkAnim,
@@ -32,6 +33,11 @@ const FONT = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 
 export class GameScene extends Phaser.Scene {
   state!: GameState;
+  levelDef: LevelDef = levelById('endless-factory');
+  paused = false;
+  onEnd: ((kind: 'gameover' | 'complete') => void) | null = null;
+  private hintsShown = new Set<number>();
+  private bannerText: Phaser.GameObjects.Text | null = null;
   tuning: Tuning = cloneTuning(DEFAULT_TUNING);
   controller!: Controller;
   readonly replay = new ReplayRecorder();
@@ -98,7 +104,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     const W = this.scale.width;
     this.view.width = W;
-    this.state = createState(ENDLESS_LEVEL, this.tuning);
+    this.state = createState(this.levelDef.data, this.tuning);
     this.resetWalk();
 
     // Background layers (parallax tile sprites).
@@ -189,9 +195,7 @@ export class GameScene extends Phaser.Scene {
     this.refreshHints();
 
     this.input.keyboard?.on('keydown-R', () => this.reset());
-    this.input.on('pointerdown', () => {
-      if (this.state.gameOver) this.reset();
-    });
+
 
     this.view.camX = this.targetCamX();
     this.updateCameraLayers();
@@ -236,7 +240,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Reset the run; keeps the current tuning and control settings. */
   reset(): void {
-    this.state = createState(ENDLESS_LEVEL, this.tuning);
+    this.state = createState(this.levelDef.data, this.tuning);
+    this.hintsShown.clear();
     this.resetWalk();
     this.accumulator = 0;
     this.speech.reset();
@@ -247,6 +252,12 @@ export class GameScene extends Phaser.Scene {
     this.overlay?.destroy();
     this.overlay = null;
     this.view.camX = this.targetCamX();
+  }
+
+  startLevel(def: LevelDef): void {
+    this.levelDef = def;
+    this.paused = false;
+    this.reset();
   }
 
   /** Restore the tuning defaults in place (the panel sliders read from the same object). */
@@ -294,6 +305,10 @@ export class GameScene extends Phaser.Scene {
   override update(_time: number, deltaMs: number): void {
     const dt = Math.min(0.1, deltaMs / 1000);
     this.lastDt = dt;
+    if (this.paused) {
+      this.render();
+      return;
+    }
     this.fpsSmoothed += (1000 / Math.max(1, deltaMs) - this.fpsSmoothed) * 0.05;
     this.updateInputScale();
     this.accumulator += dt;
@@ -322,6 +337,7 @@ export class GameScene extends Phaser.Scene {
     this.view.camX += (target - this.view.camX) * Math.min(1, dt * 6);
 
     this.announce();
+    this.showHints();
     this.render();
   }
 
@@ -467,11 +483,39 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'gameOver':
           sfx.gameOver();
-          this.showGameOver();
+          this.time.delayedCall(900, () => this.onEnd?.('gameover'));
+          break;
+        case 'levelDone':
+          sfx.cheer();
+          this.confetti.explode(60, this.scale.width / 2, 120);
+          this.time.delayedCall(1200, () => this.onEnd?.('complete'));
+          break;
+        case 'comboUp':
+          sfx.pop();
+          this.banner(`Combo x${e.value}!`, '#ffd36b', 900);
+          break;
+        case 'comboLost':
+          this.floatText(this.scale.width / 2, 120, 'Combo lost', '#ff9f96');
+          break;
+        case 'passStep':
+          this.floatText(sx, sy - 30, `+${e.value}`, '#bff0c8');
+          break;
+        case 'extraLife':
+          sfx.cheer();
+          this.banner('Extra life!', '#ff8da1', 1300);
+          this.confetti.explode(30, this.scale.width - 80, 40);
+          break;
+        case 'checkpoint':
+          this.floatText(this.scale.width / 2, 150, 'Checkpoint', '#9fd9df');
+          break;
+        case 'respawn':
+          this.resetWalk();
+          this.view.camX = this.targetCamX();
+          this.floatText(this.scale.width / 2, 170, STRINGS.newBucket, '#ffffff');
           break;
       }
     }
-    if (this.state.bucket.lossRate > 3) this.splashAt(Math.min(6, Math.round(this.state.bucket.lossRate / 3)));
+    if (this.state.bucket.lossRate > 3 && !this.state.finished) this.splashAt(Math.min(6, Math.round(this.state.bucket.lossRate / 3)));
   }
 
   private splashAt(n: number): void {
@@ -489,13 +533,27 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: t, y: y - 50, alpha: 0, duration: 1100, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
   }
 
-  private showGameOver(): void {
-    const W = this.scale.width;
-    const bg = this.add.rectangle(W / 2, GAME_H / 2, W, GAME_H, 0x071a1e, 0.75);
-    const title = this.add.text(W / 2, GAME_H / 2 - 40, STRINGS.gameOver, { fontFamily: FONT, fontSize: '44px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
-    const score = this.add.text(W / 2, GAME_H / 2 + 10, `${STRINGS.score}: ${Math.floor(this.state.score)}`, { fontFamily: FONT, fontSize: '24px', color: '#ffd36b' }).setOrigin(0.5);
-    const hint = this.add.text(W / 2, GAME_H / 2 + 50, STRINGS.tapToRestart, { fontFamily: FONT, fontSize: '16px', color: '#dff3f5' }).setOrigin(0.5);
-    this.overlay = this.add.container(0, 0, [bg, title, score, hint]).setDepth(80);
+  private banner(text: string, color: string, ms: number): void {
+    this.bannerText?.destroy();
+    const t = this.add
+      .text(this.scale.width / 2, 92, text, { fontFamily: FONT, fontSize: '24px', color, fontStyle: 'bold', stroke: '#102024', strokeThickness: 5, align: 'center', wordWrap: { width: this.scale.width - 120 } })
+      .setOrigin(0.5)
+      .setDepth(45);
+    this.bannerText = t;
+    this.tweens.add({ targets: t, alpha: 0, delay: ms, duration: 400, onComplete: () => { t.destroy(); if (this.bannerText === t) this.bannerText = null; } });
+  }
+
+  private showHints(): void {
+    const hints = this.levelDef.data.hints;
+    if (!hints) return;
+    const [a, b] = this.state.players;
+    const front = Math.max(a.x, b.x);
+    hints.forEach((h, i) => {
+      if (!this.hintsShown.has(i) && front >= h.x) {
+        this.hintsShown.add(i);
+        this.banner(h.text, '#ffffff', 3200);
+      }
+    });
   }
 
   private syncSofts(): void {

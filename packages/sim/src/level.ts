@@ -20,6 +20,7 @@ export interface LevelGenerator {
   /** x of the first generated pattern. */
   startX: number;
 }
+export type LevelHint = { x: number; text: string };
 export interface LevelData {
   id: string;
   lamps: LevelLamp[];
@@ -28,6 +29,8 @@ export interface LevelData {
   softs?: { kind: 'balloon' | 'web'; x: number; y: number; r?: number; color?: number }[];
   /** Length of the hall in we (decorative). */
   length: number;
+  /** Tutorial / story captions shown when the ladder approaches x. */
+  hints?: { x: number; text: string }[];
   /** Par time (s) for the level-end time bonus. */
   par?: number;
   theme?: 'factory' | 'studio';
@@ -159,6 +162,7 @@ export function createGen(level: LevelData, existingLamps: number, existingSteps
     last: -1,
     last2: -1,
     gapScale: 1,
+    theme: level.theme ?? 'factory',
   };
 }
 
@@ -289,6 +293,13 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
   }
   g.last2 = g.last;
   g.last = kind;
+  return emitKind(s, g, t, kind, x, d);
+}
+
+type EmitTarget = { steps: StepObstacle[]; lamps: LampState[]; beams: BeamObstacle[]; softs: SoftObstacle[] };
+
+/** One named pattern at x; returns its length. Also used to compose the scripted levels. */
+export function emitKind(s: EmitTarget, g: GenState, t: Tuning, kind: number, x: number, d: number): number {
   switch (kind) {
     case 0:
       addStep(s, g, x, pick(g, FLOOR_KINDS.filter((k) => k !== 'banana')));

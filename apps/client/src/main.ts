@@ -3,6 +3,8 @@ import { computeGameWidth, GAME_H } from './config';
 import { GameScene } from './scenes/GameScene';
 import { mountDebugPanel } from './debug/panel';
 import { mountStartScreen } from './ui/start';
+import { Screens } from './ui/screens';
+import { levelById } from '@dd/sim';
 import { mountAudioButtons } from './audio/sfx';
 import type { PlayerInput } from '@dd/sim';
 
@@ -42,7 +44,8 @@ game.events.once(Phaser.Core.Events.READY, () => {
     mountDebugPanel(scene);
     mountAudioButtons();
     exposeTestHooks(scene);
-    mountStartScreen(scene);
+    const screens = new Screens(scene);
+    mountStartScreen(scene, screens);
   };
   if (scene.scene.isActive()) mount();
   else scene.events.once(Phaser.Scenes.Events.CREATE, mount);
@@ -61,6 +64,7 @@ function exposeTestHooks(scene: GameScene): void {
     setInputOverride: (inputs: [PlayerInput, PlayerInput] | null) => scene.controller.setOverride(inputs),
     lastInputs: () => scene.lastInputs,
     reset: () => scene.reset(),
+    startLevel: (id: string) => scene.startLevel(levelById(id)),
     say: (p: 0 | 1, text: string) => scene.speech.say(p, text, 'urgent'),
   };
   (window as unknown as { __dd: typeof api }).__dd = api;

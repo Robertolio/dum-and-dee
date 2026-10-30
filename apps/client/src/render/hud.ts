@@ -10,6 +10,7 @@ export class Hud {
   private readonly g: Phaser.GameObjects.Graphics;
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly waterText: Phaser.GameObjects.Text;
+  private readonly comboText: Phaser.GameObjects.Text;
   private readonly nameDum: Phaser.GameObjects.Text;
   private readonly nameDee: Phaser.GameObjects.Text;
   private width: number;
@@ -26,6 +27,7 @@ export class Hud {
       .text(width - 26, 76, '100%', { ...style, fontSize: '20px' })
       .setOrigin(1, 0)
       .setDepth(51);
+    this.comboText = scene.add.text(176, 18, '', { ...style, fontSize: '20px', color: '#ffd36b', stroke: '#102024', strokeThickness: 4 }).setDepth(51);
     const nameStyle = { fontFamily: FONT, fontSize: '11px', color: '#ffffff', fontStyle: 'bold' };
     this.nameDum = scene.add.text(26, 59, STRINGS.dum, nameStyle).setOrigin(0.5, 0).setDepth(52);
     this.nameDee = scene.add.text(26, 101, STRINGS.dee, nameStyle).setOrigin(0.5, 0).setDepth(52);
@@ -45,6 +47,8 @@ export class Hud {
     panel(g, 14, 12, 150, 38);
     star(g, 36, 31, 12);
     this.scoreText.setText(String(Math.floor(s.score)).padStart(5, '0'));
+
+    this.comboText.setText(s.combo >= 3 ? `x${s.comboMult} · ${s.combo}` : '');
 
     // Portraits with posture bars
     for (let i = 0; i < 2; i++) {
@@ -95,8 +99,9 @@ export class Hud {
     g.fillCircle(bx + 14, 27, 2);
 
     // Hearts
-    for (let i = 0; i < 3; i++) {
-      const hx = W - 108 + i * 34;
+    const slots = Math.max(3, s.lives);
+    for (let i = 0; i < slots; i++) {
+      const hx = W - 40 - (slots - 1 - i) * 34;
       heart(g, hx, 30, 12, i < s.lives ? COLORS.heart : 0x3c5a60);
     }
 

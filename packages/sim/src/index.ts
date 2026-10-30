@@ -10,3 +10,4 @@ export { closestOnSegment, segmentCircleOverlap } from './collision';
 export * from './walk';
 export { extendLevel } from './level';
 export * from './progress';
+export * from './levels';

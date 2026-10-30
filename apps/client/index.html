@@ -139,6 +139,113 @@
         color: #1b1b1b;
         font-weight: 700;
       }
+      .screen {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(7, 26, 30, 0.88);
+        padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+        box-sizing: border-box;
+        overflow-y: auto;
+        touch-action: pan-y;
+      }
+      .screen.hidden {
+        display: none;
+      }
+      .screen .card {
+        text-align: center;
+        max-width: 760px;
+        width: 100%;
+        margin: auto;
+      }
+      .screen h2 {
+        margin: 0 0 6px;
+        font-size: 28px;
+      }
+      .screen h3 {
+        margin: 8px 0 4px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9fd9df;
+      }
+      .screen p {
+        margin: 4px 0;
+        font-size: 14px;
+        color: #cfe9ec;
+      }
+      .screen p.big {
+        font-size: 26px;
+        font-weight: 800;
+        color: #ffd36b;
+      }
+      .screen .bigstars {
+        font-size: 44px;
+        color: #ffd36b;
+        letter-spacing: 6px;
+      }
+      .screen .levels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+      }
+      .screen button {
+        background: #1d4d55;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        padding: 8px 14px;
+        font-size: 15px;
+        touch-action: manipulation;
+        min-height: 44px;
+      }
+      .screen button.level {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        width: 128px;
+        padding: 8px 6px;
+      }
+      .screen button.level .stars {
+        color: #ffd36b;
+        letter-spacing: 2px;
+      }
+      .screen button.level small {
+        font-size: 11px;
+        color: #9fd9df;
+      }
+      .screen button.endless {
+        background: #4b3a86;
+      }
+      .screen button.primary {
+        background: #3fb768;
+        color: #0b2411;
+        font-weight: 800;
+      }
+      .screen .buttons {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 12px;
+      }
+      #menu-btn {
+        position: fixed;
+        left: max(8px, env(safe-area-inset-left));
+        bottom: max(8px, env(safe-area-inset-bottom));
+        z-index: 31;
+        width: 34px;
+        height: 34px;
+        border-radius: 17px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(0, 0, 0, 0.45);
+        color: #fff;
+        font-size: 16px;
+        padding: 0;
+      }
       #start-btn {
         background: #3fb768;
         color: #0b2411;

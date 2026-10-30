@@ -380,6 +380,11 @@ class Sfx {
     this.shaped('bandpass', 5200, 1.5, 0.28, 0.12, 0.1, 0, 2200);
   }
 
+  cheer(): void {
+    if (!this.ready()) return;
+    [523, 659, 784, 1047].forEach((f, i) => this.tone('triangle', f, f, 0.18, 0.25, i * 0.09));
+  }
+
   lightsOn(): void {
     if (!this.ready()) return;
     this.tone('square', 300, 300, 0.03, 0.08);

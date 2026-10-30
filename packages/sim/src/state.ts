@@ -182,6 +182,7 @@ export interface GenState {
   last2: number;
   /** Extra/less spacing after the pattern just emitted (quiet stretches, busy combos). */
   gapScale: number;
+  theme: 'factory' | 'studio';
 }
 
 export interface LevelResult {

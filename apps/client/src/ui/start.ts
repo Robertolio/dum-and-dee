@@ -1,4 +1,6 @@
 import type { GameScene } from '../scenes/GameScene';
+import type { Screens } from './screens';
+import { levelById } from '@dd/sim';
 import { sfx } from '../audio/sfx';
 import { fullscreenSupported, toggleFullscreen } from '../platform/fullscreen';
 
@@ -6,11 +8,13 @@ const IOS_HINT = 'iPhone: tap Share, then "Add to Home Screen", and open Dum & D
 const FS_HINT = 'Tip: Start also switches to fullscreen. Keep the phone in landscape.';
 
 /** Start screen shown before play: explains Solo mode, picks analog/digital, starts the game. */
-export function mountStartScreen(scene: GameScene): void {
+export function mountStartScreen(scene: GameScene, screens: Screens): void {
   const root = document.getElementById('start');
   if (!root) return;
   if (new URLSearchParams(location.search).has('autostart')) {
     root.classList.add('hidden');
+    const lvl = new URLSearchParams(location.search).get('level');
+    screens.start(levelById(lvl ?? 'endless-factory'));
     return;
   }
   const analogBtn = root.querySelector<HTMLButtonElement>('[data-testid="start-analog"]')!;
@@ -41,8 +45,8 @@ export function mountStartScreen(scene: GameScene): void {
     sfx.click();
     scene.controller.setSettings({ source: 'touch', posture });
     scene.refreshHints();
-    scene.reset();
     root.classList.add('hidden');
+    screens.showMenu();
     void toggleFullscreen();
   });
 }
