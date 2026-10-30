@@ -82,3 +82,6 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 ## Round: bucket knocks
 - Auto-lift over props removed (only floor/stairs lift); bucket touching a prop = bucketBonk (ladder shock, swing, -3 water, bonk).
 - Cleaver (knife, 0.3 high) under ~55% of hanging meat; banana thicker; bone sticks out higher.
+
+## Round: cleaver tuning + app icon
+- Knife 0.26 high, 0.9 wide, placed 1.3 we before meat (landing room), 22% double knife 1.5 we apart. Icon + manifest added.

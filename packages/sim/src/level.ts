@@ -41,7 +41,7 @@ export const STEP_HEIGHT: Record<StepKind, number> = {
   pail: 0.45,
   tyre: 0.4,
   cheese: 0.3,
-  knife: 0.3,
+  knife: 0.26,
   stair: 0.2,
 };
 
@@ -55,7 +55,7 @@ export const STEP_WIDTH: Record<StepKind, number> = {
   pail: 0.8,
   tyre: 1.0,
   cheese: 1.0,
-  knife: 1.0,
+  knife: 0.9,
   stair: 0.7,
 };
 
@@ -177,6 +177,14 @@ function addStep(s: { steps: StepObstacle[] }, g: GenState, x: number, kind: Ste
   s.steps.push(makeStep(g.nextStepId++, x, x + (width ?? STEP_WIDTH[kind]), height ?? STEP_HEIGHT[kind], kind));
 }
 
+/** Cleaver(s) well before a hanging piece of meat, so the jump lands before the meat swings in. */
+function addKnives(s: { steps: StepObstacle[] }, g: GenState, meatX: number): void {
+  const w = STEP_WIDTH.knife;
+  const x0 = meatX - 1.0 - w - 0.3;
+  addStep(s, g, x0, 'knife');
+  if (rand(g) < 0.22) addStep(s, g, x0 - w - 1.5, 'knife');
+}
+
 function addLamp(s: { lamps: LampState[] }, g: GenState, t: Tuning, x: number, kind: LampKind, psi = 0, psiDot = 0): void {
   s.lamps.push(makeLamp(g.nextLampId++, x, kind, t, psi, psiDot));
 }
@@ -196,7 +204,7 @@ function addMeatSeries(s: { lamps: LampState[]; steps: StepObstacle[] }, g: GenS
   for (let i = 0; i < n; i++) {
     const [psi, psiDot] = swingState(amp, phase0 + i * dphase, t.meatL, t);
     addLamp(s, g, t, x + i * spacing, 'meat', psi, psiDot);
-    if (rand(g) < 0.55) addStep(s, g, x + i * spacing - STEP_WIDTH.knife / 2, 'knife');
+    if (rand(g) < 0.55) addKnives(s, g, x + i * spacing);
   }
   return (n - 1) * spacing + 1;
 }
@@ -276,7 +284,7 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
     if (rand(g) < 0.5 + d * 0.3) {
       const [psi, psiDot] = swingState(lerp(t.meatAmpMin, t.meatAmpMax, rand(g)), rand(g) * 6.28, t.meatL, t);
       addLamp(s, g, t, x + gap, 'meat', psi, psiDot);
-      addStep(s, g, x + gap - STEP_WIDTH.knife / 2, 'knife');
+      addKnives(s, g, x + gap);
     } else addLamp(s, g, t, x + gap, 'lamp');
     return gap + 1.2;
   }
