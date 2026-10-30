@@ -40,10 +40,17 @@ async function resolveFile(urlPath) {
   }
 }
 
+let api = null;
+
 const server = () => createServer(async (req, res) => {
   const headers = { 'X-Robots-Tag': 'noindex, nofollow, noarchive', 'X-Content-Type-Options': 'nosniff' };
   try {
     const { pathname } = new URL(req.url ?? '/', 'http://localhost');
+    if (pathname.startsWith('/api/')) {
+      if (api && (await api.handleHttp(req, res))) return;
+      res.writeHead(404, { ...headers, 'Content-Type': 'text/plain' }).end('Not found');
+      return;
+    }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405, headers).end();
       return;
@@ -90,7 +97,7 @@ for (const p of ports) {
 // Online two-player endpoint (/ws) on the same HTTP ports. Static serving keeps working if it fails to load.
 try {
   const online = await import('../apps/server/dist/online.mjs');
-  online.attachOnline(servers);
+  api = await online.attachOnline(servers);
   console.log('Online play: WebSocket endpoint at /ws');
 } catch (e) {
   console.error('Online play disabled:', e?.message ?? e);

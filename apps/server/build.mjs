@@ -7,7 +7,7 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node20',
-  external: ['ws'],
+  external: ['ws', 'pg', 'web-push'],
   sourcemap: false,
   logLevel: 'info',
 });
