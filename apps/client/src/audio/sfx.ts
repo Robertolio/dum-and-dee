@@ -395,6 +395,17 @@ class Sfx {
     [523, 659, 784, 1047].forEach((f, i) => this.tone('triangle', f, f, 0.18, 0.25, i * 0.09));
   }
 
+  applause(): void {
+    if (!this.ready()) return;
+    for (let i = 0; i < 7; i++) this.shaped('bandpass', 2400, 0.6, 0.06, 0.25, 0.001, i * 0.07, 3200);
+  }
+
+  buzz(): void {
+    if (!this.ready()) return;
+    this.tone('square', 150, 140, 0.35, 0.3);
+    this.tone('sawtooth', 300, 280, 0.35, 0.15);
+  }
+
   lightsOn(): void {
     if (!this.ready()) return;
     this.tone('square', 300, 300, 0.03, 0.08);

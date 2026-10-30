@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140">
+  <rect x="8" y="6" width="124" height="128" fill="#5c7fb8" stroke="#1d3257" stroke-width="5"/>
+  <path d="M8 40 H132 M8 74 H132 M8 108 H132" stroke="#3f5f94" stroke-width="3"/>
+  <path d="M40 6 V40 M90 40 V74 M50 74 V108 M100 108 V134" stroke="#3f5f94" stroke-width="3"/>
+  <path d="M40 4 L52 22 L38 34 L56 52" fill="none" stroke="#fff" stroke-width="3" opacity="0.6"/>
+  <text x="70" y="82" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#fff" opacity="0.9">SET WALL</text>
+</svg>

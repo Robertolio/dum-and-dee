@@ -77,7 +77,7 @@ export interface BucketState {
 }
 
 export type LampKind = 'lamp' | 'meat' | 'boom';
-export type SoftKind = 'balloon' | 'web' | 'wheel' | 'fan' | 'weather';
+export type SoftKind = 'balloon' | 'web' | 'wheel' | 'fan' | 'weather' | 'onair' | 'applause' | 'buzzer' | 'wall';
 
 export interface LampState {
   id: number;
@@ -97,7 +97,7 @@ export interface LampState {
   broken: boolean;
 }
 
-export type StepKind = 'bracket' | 'crate' | 'pallet' | 'banana' | 'duck' | 'pail' | 'tyre' | 'cheese' | 'knife' | 'speaker' | 'studioprop' | 'clothes' | 'film' | 'stair';
+export type StepKind = 'bracket' | 'crate' | 'pallet' | 'banana' | 'duck' | 'pail' | 'tyre' | 'cheese' | 'knife' | 'speaker' | 'studioprop' | 'clothes' | 'film' | 'clapper' | 'director' | 'cart' | 'cable' | 'carpet' | 'dummy' | 'soundboard' | 'stair';
 
 export interface StepObstacle {
   id: number;
@@ -151,6 +151,11 @@ export type GameEventType =
   | 'spin'
   | 'gust'
   | 'flip'
+  | 'onAir'
+  | 'applause'
+  | 'buzz'
+  | 'crash'
+  | 'glam'
   | 'comboUp'
   | 'comboLost'
   | 'checkpoint'

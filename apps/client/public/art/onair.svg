@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60" viewBox="0 0 100 60">
+  <rect x="4" y="8" width="92" height="44" rx="8" fill="#b01622" stroke="#4a0710" stroke-width="4"/>
+  <rect x="10" y="14" width="80" height="32" rx="5" fill="#ff3b47"/>
+  <text x="50" y="38" font-family="sans-serif" font-size="22" font-weight="900" text-anchor="middle" fill="#fff">ON AIR</text>
+</svg>

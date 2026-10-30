@@ -60,6 +60,13 @@ export const STEP_HEIGHT: Record<StepKind, number> = {
   studioprop: 0.5,
   clothes: 0.4,
   film: 0.26,
+  clapper: 0.3,
+  director: 0.6,
+  cart: 0.7,
+  cable: 0.1,
+  carpet: 0.05,
+  dummy: 0.55,
+  soundboard: 0.45,
   stair: 0.2,
 };
 
@@ -78,6 +85,13 @@ export const STEP_WIDTH: Record<StepKind, number> = {
   studioprop: 1.1,
   clothes: 1.0,
   film: 0.8,
+  clapper: 0.9,
+  director: 0.9,
+  cart: 1.3,
+  cable: 1.4,
+  carpet: 3.2,
+  dummy: 0.7,
+  soundboard: 1.2,
   stair: 0.7,
 };
 
@@ -96,6 +110,13 @@ export const STEP_MASS: Record<StepKind, number> = {
   studioprop: 1.2,
   clothes: 0.5,
   film: 0.6,
+  clapper: 0.6,
+  director: 1.5,
+  cart: 3,
+  cable: 0.3,
+  carpet: 99,
+  dummy: 0.4,
+  soundboard: 2,
   stair: 99,
 };
 
@@ -104,7 +125,8 @@ export function makeStep(id: number, x0: number, x1: number, hObj: number, kind:
 }
 
 const FACTORY_KINDS: StepKind[] = ['bracket', 'crate', 'pallet', 'banana', 'duck', 'pail', 'tyre', 'cheese'];
-const STUDIO_KINDS: StepKind[] = ['speaker', 'studioprop', 'clothes', 'film', 'banana', 'duck', 'pail', 'speaker'];
+const STUDIO_KINDS: StepKind[] = ['speaker', 'studioprop', 'clothes', 'film', 'clapper', 'director', 'cart', 'dummy', 'soundboard', 'cable', 'duck', 'pail'];
+const FLAT_KINDS: StepKind[] = ['banana', 'cable', 'carpet'];
 const meatKind = (g: GenState): LampKind => (g.theme === 'studio' ? 'boom' : 'meat');
 const floorKinds = (g: GenState): StepKind[] => (g.theme === 'studio' ? STUDIO_KINDS : FACTORY_KINDS);
 
@@ -311,7 +333,7 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
   void r2;
   g.gapScale = 1;
   // Weighted pick that never repeats the previous pattern, and avoids the one before it when possible.
-  const weights = g.theme === 'studio' ? [3, 3, 2.2, 1.4, 1.6, 1.8, 1.2, 0.2, 1.0, 1.3, 1.0, 1.1, 0.9, 1.5, 1.5, 1.4] : [3, 3, 2.4, 2, 1.6, 1.8, 1.6, 1.3, 1.1, 1.3, 1.2, 1.1, 1.0, 0, 0, 0];
+  const weights = g.theme === 'studio' ? [2.6, 2.6, 2.2, 1.4, 1.6, 1.8, 0.9, 0.2, 0.5, 1.3, 0.7, 1.1, 0.9, 1.2, 1.2, 1.1, 1.3, 1.1, 1.2, 1.2, 1.2, 1.1] : [3, 3, 2.4, 2, 1.6, 1.8, 1.6, 1.3, 1.1, 1.3, 1.2, 1.1, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   let total = 0;
   for (let i = 0; i < weights.length; i++) if (i !== g.last) total += weights[i]! * (i === g.last2 ? 0.4 : 1) * (i === 2 && d < 0.1 ? 0.3 : 1);
   let roll = rand(g) * total;
@@ -335,7 +357,7 @@ type EmitTarget = { steps: StepObstacle[]; lamps: LampState[]; beams: BeamObstac
 export function emitKind(s: EmitTarget, g: GenState, t: Tuning, kind: number, x: number, d: number): number {
   switch (kind) {
     case 0:
-      addStep(s, g, x, pick(g, floorKinds(g).filter((k) => k !== 'banana')));
+      addStep(s, g, x, pick(g, floorKinds(g).filter((k) => !FLAT_KINDS.includes(k))));
       return 1.2;
     case 1:
       addLamp(s, g, t, x, 'lamp');
@@ -411,6 +433,55 @@ export function emitKind(s: EmitTarget, g: GenState, t: Tuning, kind: number, x:
       s.softs.push({ id: g.nextSoftId++, kind: 'weather', x: x + 1, y: 1.85, r: 0.6, color: 0, done: false });
       if (rand(g) < 0.5) addLamp(s, g, t, x + 4.6, 'lamp');
       return 5.4;
+    }
+    case 16: {
+      // Commercial break: a fast, busy run of props, cables and signs.
+      g.marks.push({ x: x - 2, text: 'COMMERCIAL BREAK!' });
+      const sp = lerp(3.5, 3.1, d);
+      const solid = (): StepKind => pick(g, ['clapper', 'director', 'dummy', 'speaker', 'soundboard'] as const);
+      addStep(s, g, x, solid());
+      addStep(s, g, x + sp, 'cable');
+      s.softs.push({ id: g.nextSoftId++, kind: 'buzzer', x: x + sp * 2 + 0.4, y: 1.9, r: 0.45, color: 0, done: false });
+      addStep(s, g, x + sp * 2 + 1, solid());
+      s.softs.push({ id: g.nextSoftId++, kind: 'onair', x: x + sp * 3.2, y: 2.15, r: 0.5, color: 0, done: false });
+      addStep(s, g, x + sp * 3.7, solid());
+      g.gapScale = 1.5;
+      return sp * 3.7 + 1.2;
+    }
+    case 17: {
+      // Red carpet: walk it for glam points, with a cart and director's chair along the way.
+      addStep(s, g, x, 'carpet');
+      s.softs.push({ id: g.nextSoftId++, kind: 'applause', x: x + 1.6, y: 2.3, r: 0.5, color: 0, done: false });
+      addStep(s, g, x + 5.0, pick(g, ['cart', 'director'] as const));
+      return 6.2;
+    }
+    case 18: {
+      // Break-away set wall: push through it, then a buzzer.
+      s.softs.push({ id: g.nextSoftId++, kind: 'wall', x: x + 1, y: 1.3, r: 0.85, color: 0, done: false });
+      s.softs.push({ id: g.nextSoftId++, kind: 'buzzer', x: x + 4.4, y: 1.8, r: 0.45, color: 0, done: false });
+      if (rand(g) < 0.4 + d * 0.4) addStep(s, g, x + 7.2, 'cable');
+      return 5.6;
+    }
+    case 19: {
+      // Sound board with the APPLAUSE sign high above it.
+      addStep(s, g, x, 'soundboard');
+      s.softs.push({ id: g.nextSoftId++, kind: 'applause', x: x + 0.5, y: 2.45, r: 0.5, color: 0, done: false });
+      if (rand(g) < 0.5) addLamp(s, g, t, x + 4.8, 'lamp');
+      return 5.6;
+    }
+    case 20: {
+      // Clapperboard, then an ON AIR sign you can sweep, then a cable to trip over.
+      addStep(s, g, x, 'clapper');
+      s.softs.push({ id: g.nextSoftId++, kind: 'onair', x: x + 3.3, y: 2.0, r: 0.5, color: 0, done: false });
+      addStep(s, g, x + 5.6, 'cable');
+      return 6.6;
+    }
+    case 21: {
+      // Dummy dolls in a row, a cable between them.
+      addStep(s, g, x, 'dummy');
+      addStep(s, g, x + 3.4, 'cable');
+      addStep(s, g, x + 6.0, 'dummy');
+      return 6.8;
     }
     default: {
       // Meat first, then a prop a good stretch later.

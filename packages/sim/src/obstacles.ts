@@ -6,7 +6,7 @@ import { closestOnSegment } from './collision';
 
 /** True when the object is too high for this player to simply walk onto, and the player is on its approach side. */
 export function blocksPlayer(p: PlayerState, o: StepObstacle, t: Tuning): boolean {
-  if (o.kind === 'banana') return false;
+  if (o.kind === 'banana' || o.kind === 'cable' || o.kind === 'carpet') return false;
   const feet = p.yFloorTarget + p.jumpY;
   if (o.hObj - feet <= t.autoStepMax) return false;
   // Only the approach side blocks; once the body is over the object it is free (landing on top).
@@ -42,7 +42,7 @@ export function resolveObstacles(s: GameState, t: Tuning): void {
   const dt = t.dt;
   const fh = t.footHalf;
   for (const o of s.steps) {
-    if (o.kind === 'stair' || o.kind === 'banana') continue;
+    if (o.kind === 'stair' || o.kind === 'banana' || o.kind === 'cable' || o.kind === 'carpet') continue;
     if (o.vx !== 0) {
       const dx = o.vx * dt;
       o.x0 += dx;
@@ -119,9 +119,14 @@ export function integrateSofts(s: GameState, t: Tuning): void {
       wheel: [t.scoreWheel, 'spin'],
       fan: [t.scoreFan, 'gust'],
       weather: [t.scoreWeather, 'flip'],
+      onair: [t.scoreOnAir, 'onAir'],
+      applause: [t.scoreApplause, 'applause'],
+      buzzer: [t.scoreBuzzer, 'buzz'],
+      wall: [t.scoreWall, 'crash'],
     } as const;
     const [pts, type] = table[o.kind];
     s.score += pts;
+    if (o.kind === 'wall') loseWater(s, 5);
     s.events.push({ tick: s.tick, type, value: pts, x: o.x, y: o.y });
   }
 }

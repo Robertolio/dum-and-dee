@@ -160,6 +160,11 @@ export interface Tuning {
   scoreWheel: number;
   scoreFan: number;
   scoreWeather: number;
+  scoreOnAir: number;
+  scoreApplause: number;
+  scoreBuzzer: number;
+  scoreWall: number;
+  scoreCarpet: number;
   startLives: number;
   maxLives: number;
   extraLifeEvery: number;
@@ -275,6 +280,11 @@ export const DEFAULT_TUNING: Tuning = {
   scoreWheel: 40,
   scoreFan: 30,
   scoreWeather: 40,
+  scoreOnAir: 60,
+  scoreApplause: 80,
+  scoreBuzzer: 100,
+  scoreWall: 50,
+  scoreCarpet: 40,
   startLives: 3,
   maxLives: 5,
   extraLifeEvery: 2000,

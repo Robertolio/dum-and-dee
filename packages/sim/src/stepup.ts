@@ -12,7 +12,15 @@ export function updateStepTargets(s: GameState, t: Tuning): void {
     const hi = p.x + t.footHalf;
     let target = 0;
     for (const o of s.steps) {
-      if (o.kind === 'banana') {
+      if (o.kind === 'carpet') {
+        if (!o.used && Math.abs(p.x - (o.x0 + o.x1) / 2) < 0.3) {
+          o.used = true;
+          s.score += t.scoreCarpet;
+          s.events.push({ tick: s.tick, type: 'glam', player: i as PlayerId, value: t.scoreCarpet, x: p.x, y: 0 });
+        }
+        continue;
+      }
+      if (o.kind === 'banana' || o.kind === 'cable') {
         if (!o.used && Math.abs(p.x - (o.x0 + o.x1) / 2) < 0.3 && p.yFloor + p.jumpY < 0.12 && p.slipTimer <= 0) {
           o.used = true;
           triggerSlip(s, i as PlayerId, t);

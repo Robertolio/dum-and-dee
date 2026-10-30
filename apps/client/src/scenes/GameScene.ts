@@ -117,6 +117,18 @@ export class GameScene extends Phaser.Scene {
       ['studioprop', 110, 50],
       ['clothes', 100, 40],
       ['film', 80, 26],
+      ['clapper', 90, 30],
+      ['director', 90, 60],
+      ['cart', 130, 70],
+      ['cable', 140, 14],
+      ['carpet', 320, 10],
+      ['dummy', 70, 55],
+      ['soundboard', 120, 45],
+      ['onair', 100, 60],
+      ['applause', 110, 60],
+      ['buzzer', 80, 80],
+      ['setwall', 140, 140],
+      ['teleprompter', 70, 120],
       ['boom', 100, 120],
       ['studio-cap', 80, 60],
       ['wheel', 150, 150],
@@ -299,6 +311,7 @@ export class GameScene extends Phaser.Scene {
     this.levelDef = def;
     this.paused = false;
     this.curTheme = themeAtX(!!def.data.mixed, def.theme, 0);
+    this.commercial.clear();
     this.applyTheme();
     this.reset();
   }
@@ -420,7 +433,8 @@ export class GameScene extends Phaser.Scene {
     for (const m of s.beams) check(`b${m.id}`, m.x0, 'Duck!');
     for (const o of s.steps) {
       if (o.kind === 'stair') continue;
-      if (o.kind === 'banana') check(`s${o.id}`, o.x0, 'Watch out!');
+      if (o.kind === 'banana' || o.kind === 'cable') check(`s${o.id}`, o.x0, 'Watch out!');
+      else if (o.kind === 'carpet') continue;
       else if (o.hObj > this.tuning.autoStepMax) check(`s${o.id}`, o.x0 - 1.0, 'Jump!');
     }
   }
@@ -509,6 +523,38 @@ export class GameScene extends Phaser.Scene {
           this.burst(this.confetti, 16, sx, sy);
           this.speech.say(null, 'Sunshine!', 'cheer');
           break;
+        case 'onAir':
+          sfx.pop();
+          this.cameras.main.flash(120, 255, 60, 70);
+          this.floatText(sx, sy - 40, `+${e.value}`, '#ff8a92');
+          this.speech.say(null, "We're live!", 'cheer');
+          break;
+        case 'applause':
+          sfx.applause();
+          this.burst(this.confetti, 22, sx, sy);
+          this.floatText(sx, sy - 40, `+${e.value}`, '#ffd36b');
+          this.speech.say(null, 'Applause!', 'cheer');
+          break;
+        case 'buzz':
+          sfx.buzz();
+          this.floatText(sx, sy - 40, `+${e.value}`, '#ffd36b');
+          this.speech.say(null, 'Bzzzt!', 'cheer');
+          break;
+        case 'glam':
+          sfx.cheer();
+          this.burst(this.confetti, 14, sx, FLOOR_Y - 20);
+          this.floatText(sx, FLOOR_Y - 80, `+${e.value} glam`, '#ffd36b');
+          break;
+        case 'crash': {
+          sfx.thud(true);
+          this.shake = 0.3;
+          this.burst(this.papers, 24, sx, sy);
+          this.floatText(sx, sy - 40, `+${e.value}`, '#ffd36b');
+          const w = this.add.image(sx, sy, 'setwall').setDisplaySize(212, 212).setDepth(13).setOrigin(0.5, 1);
+          this.tweens.add({ targets: w, angle: 80, y: FLOOR_Y, alpha: 0, duration: 650, onComplete: () => w.destroy() });
+          this.speech.say(null, 'Oops, the set!', 'urgent');
+          break;
+        }
         case 'sweep':
           sfx.fwip();
           this.floatText(sx, sy - 24, `+${e.value}`, '#dff3f5');
@@ -670,7 +716,7 @@ export class GameScene extends Phaser.Scene {
       live.add(o.id);
       let img = this.softSprites.get(o.id);
       if (!img) {
-        const key = o.kind === 'weather' ? 'weather-bad' : o.kind;
+        const key = o.kind === 'weather' ? 'weather-bad' : o.kind === 'wall' ? 'setwall' : o.kind;
         img = this.add.image(0, 0, key).setDepth(o.kind === 'balloon' ? 13 : setPiece ? 4 : 12);
         if (o.kind === 'balloon') {
           const palette = [0xff5a5f, 0xffd23f, 0x3bceac, 0x4ea8de, 0xb084f5, 0xff9f1c];
@@ -766,6 +812,7 @@ export class GameScene extends Phaser.Scene {
       put(`set${z}`, sets[z % 3]!, cx, 320, 220);
       put(`cam${z}a`, 'camera', cx - 9, 80, 110);
       if (this.quality === 0) put(`man${z}a`, 'cameraman', cx - 11.2, 80, 110);
+      if (z % 3 === 0) put(`tp${z}`, 'teleprompter', cx - 14.5, 56, 96);
       put(`cam${z}b`, 'camera', cx + 10, 80, 110, true);
       if (this.quality === 0) put(`man${z}b`, 'cameraman', cx + 12.2, 80, 110, true);
     }
@@ -830,7 +877,39 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private ticker: Phaser.GameObjects.Text | null = null;
+  private tickerBg: Phaser.GameObjects.Rectangle | null = null;
+
+  private updateTicker(): void {
+    const studio = this.curTheme === 'studio';
+    if (studio && !this.ticker) {
+      this.tickerBg = this.add.rectangle(0, FLOOR_Y + 26, this.scale.width, 20, 0x7a1a22, 0.9).setOrigin(0, 0).setDepth(8);
+      this.ticker = this.add
+        .text(0, FLOOR_Y + 28, 'LIVE  \u25B6  BREAKING: two men carry a ladder through the studio  \u25B6  Weather: sunny, if you flip the map  \u25B6  Sports: bucket still not empty  \u25B6  LIVE  \u25B6  BREAKING: two men carry a ladder through the studio  \u25B6  Weather: sunny, if you flip the map  \u25B6  Sports: bucket still not empty  \u25B6  ', { fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#ffe27a' })
+        .setDepth(9);
+    }
+    this.ticker?.setVisible(studio);
+    this.tickerBg?.setVisible(studio);
+    if (studio && this.ticker) this.ticker.x = -((this.time.now * 0.06) % Math.max(300, this.ticker.width / 2));
+  }
+
+  private commercial = new Set<number>();
+
+  private syncMarks(): void {
+    const g = this.state.gen;
+    if (!g) return;
+    const front = Math.max(this.state.players[0].x, this.state.players[1].x);
+    for (const m of g.marks) {
+      if (!m.text.startsWith('COMMERCIAL') || this.commercial.has(m.x) || front < m.x - 6) continue;
+      this.commercial.add(m.x);
+      this.banner('COMMERCIAL BREAK!', '#ff6a74', 1600);
+      sfx.tick();
+    }
+  }
+
   private syncTheme(): void {
+    this.updateTicker();
+    this.syncMarks();
     const d = this.levelDef.data;
     if (!d.mixed) return;
     const front = Math.max(this.state.players[0].x, this.state.players[1].x);
