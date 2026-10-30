@@ -111,6 +111,7 @@ The app keeps one social socket for presence and invites; game sockets authentic
 | `teams` | `a`, `b`, `name`, `pending_name`, `proposer`, `updated` |
 | `invites` | `id`, `from_id`, `to_id`, `room` (the room link), `created`, `expires` |
 | `push_subscriptions` | `id`, `player_id`, `endpoint` (unique), `p256dh`, `auth`, `created` |
+| `settings` | `k` (PK), `v`; holds `vapid_public` / `vapid_private` when generated |
 
 Rooms themselves stay in memory (they last minutes); the "rooms link" is `invites.room`, valid while the room is in its lobby. Schema is portable SQL (TEXT/BIGINT/INTEGER, `?` placeholders converted to `$n` for Postgres).
 
@@ -127,17 +128,22 @@ Rooms themselves stay in memory (they last minutes); the "rooms link" is `invite
 | `DATABASE_URL` | Postgres connection string (Railway Postgres plugin) |
 | `SQLITE_FILE` | SQLite path when no `DATABASE_URL` (default `./data/dd.sqlite`) |
 | `ADMIN_KEY` | Enables `/api/admin/*` (sent as header `x-admin-key`); unset = endpoints return 404 |
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Web Push keys; unset = push off, WhatsApp nudge fallback |
-| `VAPID_SUBJECT` | Contact for push services, e.g. `mailto:you@example.com` |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Optional override for the Web Push keys. If not both set, the server generates a key pair on first start and keeps it in the database (table `settings`), so push works without manual keys |
+| `VAPID_SUBJECT` | Optional contact for push services; default `mailto:admin@example.invalid` |
+
+Note: the generated keys live in the database. With the SQLite fallback on Railway they vanish on every deploy (and every browser subscription with them), so push is only stable once Postgres is attached.
 
 ## Railway: exact steps
 
+Only three things are required:
+
 1. Project -> New -> Database -> Add PostgreSQL.
-2. Open the web service (`ddclient`) -> Variables -> New Variable -> Add Reference: `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (use the plugin's name if it is not "Postgres").
-3. Locally run `pnpm vapid`; copy its three lines into the web service variables: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (your `mailto:` address). Keys are printed, never stored in the repo.
-4. Add `ADMIN_KEY` with a long random value (for example `openssl rand -hex 24`).
-5. Redeploy. The log should show `Social: pg store, push on, admin on`. Tables are created on first start.
-6. Tell players on iPhone to open the game from the home screen app for notifications (iOS 16.4+).
+2. Web service (`ddclient`) -> Variables -> New Variable -> Add Reference: `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (use the plugin's name if it is not "Postgres").
+3. Add `ADMIN_KEY` with a long random value (for example `openssl rand -hex 24`).
+
+Redeploy. The log should show `Social: pg store, push on (keys from db), admin on`. Tables and push keys are created on first start.
+
+Optional: set `VAPID_*` yourself (`pnpm vapid` prints a fresh set) if you want to control the keys. On iPhone, players need the home screen app for notifications (iOS 16.4+).
 
 ## Admin (basic)
 
@@ -163,6 +169,6 @@ Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per h
 ## Not tested
 
 - Real Postgres (only `pg-mem`, an in-memory emulation of the SQL dialect); the SSL setting and Railway's reference variable are untested until the first deploy with `DATABASE_URL`.
-- Web Push delivery to real devices (iOS home screen app, Android Chrome, desktop): the service worker, subscription and the server send path with a fake sender are tested, the VAPID signing/`web-push` call against real push services is not. `pnpm vapid` was run (keys not kept).
+- Web Push delivery to real devices (auto-generated keys are unit-tested on SQLite and pg-mem only) (iOS home screen app, Android Chrome, desktop): the service worker, subscription and the server send path with a fake sender are tested, the VAPID signing/`web-push` call against real push services is not. `pnpm vapid` was run (keys not kept).
 - Real iPhone behaviour of the `?invite=` landing, "Add to Home Screen" and standalone detection (simulated by user agent only), real WhatsApp opening the link.
 - Admin endpoints against production.

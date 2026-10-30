@@ -63,6 +63,10 @@ export const MIGRATIONS: Array<{ v: number; sql: string[] }> = [
       `CREATE INDEX push_player ON push_subscriptions (player_id)`,
     ],
   },
+  {
+    v: 2,
+    sql: [`CREATE TABLE settings (k TEXT PRIMARY KEY, v TEXT NOT NULL)`],
+  },
 ];
 
 export async function migrate(db: Db): Promise<void> {

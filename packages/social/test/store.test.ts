@@ -94,3 +94,29 @@ describe('admin API', () => {
     srv.close();
   });
 });
+
+describe('VAPID keys', () => {
+  it('generates once, persists in settings, env overrides', async () => {
+    const { resolveVapid, DEFAULT_VAPID_SUBJECT } = await import('../src');
+    const db = await openSqlite(':memory:');
+    const a = await resolveVapid(db, {});
+    expect(a.source).toBe('db');
+    expect(a.VAPID_PUBLIC_KEY.length).toBeGreaterThan(40);
+    expect(a.VAPID_SUBJECT).toBe(DEFAULT_VAPID_SUBJECT);
+    const b = await resolveVapid(db, { VAPID_SUBJECT: 'mailto:me@x.nl' });
+    expect(b.VAPID_PUBLIC_KEY).toBe(a.VAPID_PUBLIC_KEY);
+    expect(b.VAPID_PRIVATE_KEY).toBe(a.VAPID_PRIVATE_KEY);
+    expect(b.VAPID_SUBJECT).toBe('mailto:me@x.nl');
+    const c = await resolveVapid(db, { VAPID_PUBLIC_KEY: 'P', VAPID_PRIVATE_KEY: 'Q' });
+    expect(c).toMatchObject({ source: 'env', VAPID_PUBLIC_KEY: 'P', VAPID_PRIVATE_KEY: 'Q' });
+  });
+  it('works on the pg adapter (pg-mem)', async () => {
+    const { newDb } = await import('pg-mem');
+    const { Pool } = newDb().adapters.createPg();
+    const db = wrapPg(new Pool());
+    await migrate(db);
+    const { resolveVapid } = await import('../src');
+    const a = await resolveVapid(db, {});
+    expect((await resolveVapid(db, {})).VAPID_PRIVATE_KEY).toBe(a.VAPID_PRIVATE_KEY);
+  });
+});

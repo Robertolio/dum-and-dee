@@ -3,7 +3,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { MAX_MSG_BYTES, RoomManager } from '@dd/net';
-import { Hub, Social, createAdminHandler, createPushSender, openStore, type HubConn } from '@dd/social';
+import { Hub, Social, createAdminHandler, createPushSender, openStore, resolveVapid, type HubConn } from '@dd/social';
 
 interface ConnLike {
   message(raw: string): void;
@@ -33,10 +33,10 @@ export async function attachOnline(servers: Server[]): Promise<Online> {
   try {
     const db = await openStore(process.env);
     const social = new Social(db, { now: () => Date.now(), randomBytes: (n) => randomBytes(n) });
-    hub = new Hub(mgr, social, createPushSender(process.env), { now: () => Date.now() });
+    hub = new Hub(mgr, social, createPushSender({ ...process.env, ...(await resolveVapid(db, process.env)) }), { now: () => Date.now() });
     const h = hub;
     admin = createAdminHandler(social, process.env.ADMIN_KEY, () => Date.now(), { onPlayerRemoved: (id) => h.kick(id), onPlayerChanged: (id) => void h.refresh(id) });
-    console.log(`Social: ${db.kind} store, push ${h.push.publicKey ? 'on' : 'off (no VAPID keys)'}, admin ${process.env.ADMIN_KEY ? 'on' : 'off'}`);
+    console.log(`Social: ${db.kind} store, push ${h.push.publicKey ? (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY ? 'on (keys from env)' : 'on (keys from db)') : 'off'}, admin ${process.env.ADMIN_KEY ? 'on' : 'off'}`);
     void social.purgeInactive().catch(() => undefined);
     setInterval(() => void social.purgeInactive().catch(() => undefined), 24 * 3600_000).unref();
   } catch (e) {
