@@ -61,7 +61,7 @@ test.describe('Identity and friends', () => {
     const codeA = (await a.getByTestId('friends-my-code').textContent())!;
     expect(codeA).toMatch(/^ROB-[2-9A-Z]{3}$/);
     const href = (await a.getByTestId('friends-wa').getAttribute('href'))!;
-    expect(decodeURIComponent(href.split('text=')[1]!)).toBe(`Play Dum & Dee with me: http://localhost:4600/?invite=${codeA} — my code is ${codeA}`);
+    expect(decodeURIComponent(href.split('text=')[1]!)).toBe(`Play Dum & Dee with me: ${new URL(a.url()).origin}/?invite=${codeA} — my code is ${codeA}`);
 
     await register(b, 'Mia');
     await b.getByTestId('btn-friends').click();
