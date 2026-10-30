@@ -112,3 +112,6 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 - See `docs/online.md`. Server-authoritative 60 Hz sim, 20 Hz snapshots, client prediction with a lead of `ceil((rtt/2 + 1.5 jitter + 20 ms)/16.7 ms)` ticks, own inputs replayed after each snapshot, correction offsets decay with tau 120 ms.
 - Room codes: 6 characters from a 31-letter alphabet, reconnect grace 60 s, rooms idle out after 10 min, per socket rate limits.
 - `scripts/serve.mjs` loads `apps/server/dist/online.mjs` (built by `pnpm build`) and attaches `/ws` to the same HTTP servers; `DD_SINGLE_PORT=1` disables the extra safety-net ports (used by e2e).
+
+## Round: identity, friends, invites (phase 4)
+- New package `packages/social` (identity, friends, teams, invites, push, admin, SQLite/Postgres store), wired into the same `/ws` and `/api/admin/*`; client: Friends screen, first-start name prompt (skippable), invite banner, `sw.js` for push, `public/privacy.html`. Details, env vars and Railway steps in `docs/online.md`.

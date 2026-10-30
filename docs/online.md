@@ -68,3 +68,101 @@ Server to client: `hello`, `joined {room, token, seat, host}`, `room {phase, lev
 No real phones, no real mobile networks, no iOS Safari lock/unlock behaviour (only simulated by closing the socket), no load test beyond the unit-level limits, no TURN/NAT issues (not relevant: plain WebSocket over HTTPS), no Android back-button handling, no QR scan with a real camera (the QR comes from a library, rendered and visually checked).
 
 Against production: `E2E_BASE=https://ddclient-production-47c1.up.railway.app npx playwright test e2e/online.spec.ts` (run once after the deploy of this feature: passed, two browser contexts over wss through the Railway proxy, states within 0.1 we).
+
+# Identity, friends and invites
+
+Built on top of the rooms above. Room codes and QR stay as the fallback (no account needed). Solo and one-screen play never need an identity: "Skip for now" at first start keeps everything anonymous.
+
+## What a device and a player are
+
+- First start: pick a name (2-16 characters, letters/digits/space and `. ' _ & -`, profanity filter EN+NL). The server returns a secret device token (48 hex characters). The browser keeps `{token, name}` in `localStorage` key `dd-id`; the server keeps only a SHA-256 hash of the token. Tokens are never logged.
+- Friend code: `ROB-7K2` (3 letters from the name, then 3 random characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, no 0/O/1/I/L in the random part). Renewable ("Renew my code"). Typed codes accept any case, with or without dash.
+- No personal data: no email, phone, location or analytics.
+- "Delete me" (Friends, Settings): deletes the player, friendships, blocks, team names, invites and push subscriptions on the server and clears `dd-id` on the device. Accounts unused for 180 days are purged at start and daily.
+
+## Friends
+
+- Add by code sends a request; the other player must accept (mutual). Crossing requests auto-accept. There is no search by name and no friends-of-friends; a player only ever sees their own friends, requests and blocks.
+- Friends list shows name, online/offline dot and the team name. Remove ends the friendship for both. Block removes the friendship, hides future requests from the blocked player (they get no error) and can be undone under "Blocked".
+- Team name per pair: default `<A> & <B>`; one side proposes a name (max 24, same filter), the other must confirm, the old name stays until then. Stored per pair for a future leaderboard.
+
+## Playing together
+
+- "Play with <name>": the client opens a normal room, then sends `invite {id, room}` over the same socket. The server checks that the socket is in that lobby and that the two are friends.
+  - Friend online (WebSocket): `invite` event and the banner "<name> is waiting - Join".
+  - Friend offline: Web Push if they subscribed; otherwise the lobby shows a WhatsApp "nudge" button. Invites also appear in `me.invites` for 15 minutes, so the banner is there when the app opens (only while the room is still in the lobby).
+- WhatsApp invite text: `Play Dum & Dee with me: <origin>/?invite=CODE — my code is CODE`.
+- `?invite=CODE` landing: on iPhone Safari (not standalone, no identity in this browser) an explanation: "Add to Home Screen, open it, enter code CODE" with a link "I already have the app" -> "Open the app and enter code CODE" (iOS keeps separate storage for Safari and the home screen app, so the page cannot know which one the player has; both texts are offered). Elsewhere (Android/desktop/identity present) the code is prefilled in the first start ("Have an invite code?") or sent as a friend request.
+- Push permission is asked only on a deliberate tap (Friends > Settings > Notifications). On iOS outside the home screen app, or where `PushManager` is missing, the screen explains why and points to the WhatsApp nudge.
+
+## Wire (same `/ws`, JSON)
+
+Client to server: `reg{name}`, `auth{token}`, `sync`, `rename`, `renew`, `delete_me`, `fr_add{code}`, `fr_yes/fr_no/fr_del/fr_block/fr_unblock{id}`, `team_set{id,name}`, `team_yes/team_no{id}`, `invite{id,room}`, `invite_dismiss{id}`, `push_sub{endpoint,p256dh,auth}`, `push_unsub{endpoint}`. Social messages are intercepted before the room manager, rate limited per socket (5/s, burst 15), and every id/code/endpoint is validated.
+Server to client: `reg_ok{token}`, `cfg{vapid}`, `me{me}` (full own view, re-sent when anything relevant changes, including a friend going online/offline), `auth_fail`, `soc_err{code}`, `invite{id,from,name,room}`, `invite_sent{delivered: live|push|none}`, `push_ok`, `deleted`.
+The app keeps one social socket for presence and invites; game sockets authenticate too (needed for `invite`).
+
+## Data model (`packages/social/src/db.ts`, auto-migrated at start via `schema_version`)
+
+| Table | Columns |
+|---|---|
+| `players` | `id`, `token_hash` (unique), `name`, `code` (unique), `blocked`, `created`, `last_seen` |
+| `friendships` | `a`, `b` (a < b), `state` (pending/accepted), `requester`, `created`; PK (a, b) |
+| `blocks` | `blocker`, `blocked` |
+| `teams` | `a`, `b`, `name`, `pending_name`, `proposer`, `updated` |
+| `invites` | `id`, `from_id`, `to_id`, `room` (the room link), `created`, `expires` |
+| `push_subscriptions` | `id`, `player_id`, `endpoint` (unique), `p256dh`, `auth`, `created` |
+
+Rooms themselves stay in memory (they last minutes); the "rooms link" is `invites.room`, valid while the room is in its lobby. Schema is portable SQL (TEXT/BIGINT/INTEGER, `?` placeholders converted to `$n` for Postgres).
+
+## Storage
+
+- `DATABASE_URL` set: Postgres (`pg`, SSL unless the host is local or `*.railway.internal`).
+- Otherwise a SQLite file via Node's built-in `node:sqlite` (Node 22.13+, pinned by `nixpacks.toml`): `./data/dd.sqlite`, override with `SQLITE_FILE` (`:memory:` for tests). The container disk on Railway is wiped on every deploy unless a volume is mounted at `/app/data`; use Postgres for anything you want to keep.
+- If the store cannot open, the server logs it and keeps serving the game without social features.
+
+## Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Postgres connection string (Railway Postgres plugin) |
+| `SQLITE_FILE` | SQLite path when no `DATABASE_URL` (default `./data/dd.sqlite`) |
+| `ADMIN_KEY` | Enables `/api/admin/*` (sent as header `x-admin-key`); unset = endpoints return 404 |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Web Push keys; unset = push off, WhatsApp nudge fallback |
+| `VAPID_SUBJECT` | Contact for push services, e.g. `mailto:you@example.com` |
+
+## Railway: exact steps
+
+1. Project -> New -> Database -> Add PostgreSQL.
+2. Open the web service (`ddclient`) -> Variables -> New Variable -> Add Reference: `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (use the plugin's name if it is not "Postgres").
+3. Locally run `pnpm vapid`; copy its three lines into the web service variables: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (your `mailto:` address). Keys are printed, never stored in the repo.
+4. Add `ADMIN_KEY` with a long random value (for example `openssl rand -hex 24`).
+5. Redeploy. The log should show `Social: pg store, push on, admin on`. Tables are created on first start.
+6. Tell players on iPhone to open the game from the home screen app for notifications (iOS 16.4+).
+
+## Admin (basic)
+
+All need header `x-admin-key: $ADMIN_KEY`; wrong keys are rate limited (10/min/IP).
+
+```
+GET    /api/admin/players?limit=100              list (no tokens)
+POST   /api/admin/players/<id>/rename   {"name":"..."}   (filter applies)
+POST   /api/admin/players/<id>/block                      (kicks live sockets, login refused)
+POST   /api/admin/players/<id>/unblock
+DELETE /api/admin/players/<id>                            (same wipe as "Delete me")
+```
+
+## Limits and safety
+
+Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per hour per IP. Max 16 sockets per IP (existing). Names/team names validated and filtered on the server; messages are size-capped (4 KB, 600 B for social except push subscriptions).
+
+## Tests
+
+- Unit (`pnpm --filter @dd/social test`, 47 tests): codes, filter (incl. false-positive names), rate limiter, registration/token hashing, friendship flow (mutual accept, decline, crossing requests, remove, block/unblock, no friends-of-friends, rate limits), team-name confirmation, invites (friends only, expiry, dismiss), delete-me wipe, admin API over real HTTP, hub with fake sockets (live invite, push for offline, dead subscription cleanup, delete-me, room protocol unaffected), SQLite persistence across reopen, the same service on the Postgres adapter through `pg-mem`.
+- E2E (`e2e/friends.spec.ts`): A creates identity, B enters the code, A accepts, team name proposed and confirmed, A "Play with B", B sees the banner and joins the room; also name filter, identity surviving a reload, skip, delete-me, `?invite=` on iPhone UA and desktop.
+
+## Not tested
+
+- Real Postgres (only `pg-mem`, an in-memory emulation of the SQL dialect); the SSL setting and Railway's reference variable are untested until the first deploy with `DATABASE_URL`.
+- Web Push delivery to real devices (iOS home screen app, Android Chrome, desktop): the service worker, subscription and the server send path with a fake sender are tested, the VAPID signing/`web-push` call against real push services is not. `pnpm vapid` was run (keys not kept).
+- Real iPhone behaviour of the `?invite=` landing, "Add to Home Screen" and standalone detection (simulated by user agent only), real WhatsApp opening the link.
+- Admin endpoints against production.
