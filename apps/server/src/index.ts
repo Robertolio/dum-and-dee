@@ -30,11 +30,14 @@ export async function attachOnline(servers: Server[]): Promise<Online> {
   const mgr = new RoomManager({ now: clock, randomBytes: (n) => randomBytes(n) });
   let hub: Hub | null = null;
   let admin: ReturnType<typeof createAdminHandler> | null = null;
+  const health = { db: 'none' as string, vapid: false };
   try {
     const db = await openStore(process.env);
     const social = new Social(db, { now: () => Date.now(), randomBytes: (n) => randomBytes(n) });
     hub = new Hub(mgr, social, createPushSender({ ...process.env, ...(await resolveVapid(db, process.env)) }), { now: () => Date.now() });
     const h = hub;
+    health.db = db.kind === 'pg' ? 'postgres' : db.kind;
+    health.vapid = !!h.push.publicKey;
     admin = createAdminHandler(social, process.env.ADMIN_KEY, () => Date.now(), { onPlayerRemoved: (id) => h.kick(id), onPlayerChanged: (id) => void h.refresh(id) });
     console.log(`Social: ${db.kind} store, push ${h.push.publicKey ? (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY ? 'on (keys from env)' : 'on (keys from db)') : 'off'}, admin ${process.env.ADMIN_KEY ? 'on' : 'off'}`);
     void social.purgeInactive().catch(() => undefined);
@@ -106,6 +109,11 @@ export async function attachOnline(servers: Server[]): Promise<Online> {
     mgr,
     hub,
     async handleHttp(req, res) {
+      if (req.method === 'GET' && new URL(req.url ?? '/', 'http://x').pathname === '/api/health') {
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        res.end(JSON.stringify({ ok: true, db: health.db, vapid: health.vapid }));
+        return true;
+      }
       if (!admin) return false;
       return admin(req, res, clientIp(req));
     },
