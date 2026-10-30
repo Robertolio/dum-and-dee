@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createState, extendLevel, levelById, LEVELS } from '../src/index';
+import { CAMPAIGN, createState, extendLevel, levelById, LEVELS, MIXED_ZONE, nextLevel, themeAtX } from '../src/index';
 import { freshState, runFor, T, upright } from './helpers';
 
 describe('TV studio', () => {
   it('the studio generator makes its own props, booms and interactive set pieces', () => {
-    const s = createState(levelById('endless-studio').data, T);
+    const s = createState({ id: 'st', length: 1e9, lamps: [], steps: [], theme: 'studio', generator: { seed: 777001, startX: 16 } }, T);
     const kinds = new Set<string>();
     const softs = new Set<string>();
     const lamps = new Set<string>();
@@ -46,6 +46,26 @@ describe('TV studio', () => {
 
   it('studio levels are registered with both themes in the list', () => {
     expect(LEVELS.filter((l) => l.theme === 'studio' && !l.endless).length).toBe(3);
-    expect(LEVELS.some((l) => l.id === 'endless-studio')).toBe(true);
+    expect(LEVELS.filter((l) => l.endless).length).toBe(1);
+  });
+
+  it('the campaign runs from the factory straight into the studio', () => {
+    expect(CAMPAIGN[0]!.id).toBe('f0');
+    expect(nextLevel('f5')!.id).toBe('s1');
+    expect(nextLevel(CAMPAIGN[CAMPAIGN.length - 1]!.id)).toBeUndefined();
+  });
+
+  it('endless mixes zones and leaves gate marks', () => {
+    expect(themeAtX(true, 'factory', 10)).toBe('factory');
+    expect(themeAtX(true, 'factory', MIXED_ZONE + 10)).toBe('studio');
+    expect(themeAtX(false, 'factory', MIXED_ZONE + 10)).toBe('factory');
+    const s = createState(levelById('endless').data, T);
+    const texts: string[] = [];
+    for (let x = 0; x < MIXED_ZONE * 3; x += 3) {
+      extendLevel(s, x, T);
+      for (const m of s.gen!.marks) if (!texts.includes(m.text)) texts.push(m.text);
+    }
+    expect(texts).toContain('Now entering: TV Studio');
+    expect(texts).toContain('Back to the Factory');
   });
 });

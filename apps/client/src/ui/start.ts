@@ -14,7 +14,7 @@ export function mountStartScreen(scene: GameScene, screens: Screens): void {
   if (new URLSearchParams(location.search).has('autostart')) {
     root.classList.add('hidden');
     const lvl = new URLSearchParams(location.search).get('level');
-    screens.start(levelById(lvl ?? 'endless-factory'));
+    screens.start(levelById(lvl ?? 'endless'));
     return;
   }
   const analogBtn = root.querySelector<HTMLButtonElement>('[data-testid="start-analog"]')!;

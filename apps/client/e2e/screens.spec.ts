@@ -7,8 +7,8 @@ test.describe('Menu, level select, game over and level complete', () => {
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__dd !== undefined);
     await page.getByTestId('start-button').click();
+    await page.getByTestId('btn-levels').click();
     await expect(page.getByTestId('level-s1')).toBeVisible();
-    await expect(page.getByTestId('level-endless-studio')).toBeVisible();
     await page.getByTestId('level-s1').click();
     await page.evaluate(() => (window as any).__dd.setInputOverride([{ push: 0.7, hTarget: 0.8 }, { push: 0.7, hTarget: 0.8 }]));
     await page.waitForTimeout(3000);
@@ -21,13 +21,29 @@ test.describe('Menu, level select, game over and level complete', () => {
     await page.waitForFunction(() => (window as any).__dd !== undefined);
     await page.getByTestId('start-button').click();
     await expect(page.getByTestId('menu-screen')).toBeVisible();
+    await expect(page.getByTestId('btn-play')).toContainText('Play');
+    await expect(page.getByTestId('btn-endless')).toBeVisible();
+    await expect(page.getByTestId('level-f0')).toHaveCount(0);
+    await page.getByTestId('btn-levels').click();
     await expect(page.getByTestId('level-f0')).toBeVisible();
-    await expect(page.getByTestId('level-endless-factory')).toBeVisible();
     await page.getByTestId('level-f1').click();
     await expect(page.getByTestId('menu-screen')).toBeHidden();
     const id = await page.evaluate(() => (window as any).__dd.getState().levelLength);
     expect(id).toBeGreaterThan(100);
     await page.waitForFunction(() => (window as any).__dd.getState().tick > 20);
+  });
+
+  test('Continue resumes the campaign at the first unfinished level; Endless starts the mixed run', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.setItem('dd-progress', JSON.stringify({ levels: { f0: { stars: 3, best: 9 }, f1: { stars: 2, best: 9 } }, endless: {} })));
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__dd !== undefined);
+    await page.getByTestId('start-button').click();
+    await expect(page.getByTestId('btn-play')).toContainText('Continue');
+    await expect(page.getByTestId('btn-play')).toContainText('Butcher aisle');
+    await page.getByTestId('btn-endless').click();
+    await page.waitForFunction(() => (window as any).__dd.getState().tick > 20);
+    expect(await page.evaluate(() => (window as any).__dd.getState().mixed)).toBe(true);
   });
 
   test('game over shows score with Play again and Menu', async ({ page }) => {

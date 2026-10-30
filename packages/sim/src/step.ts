@@ -95,6 +95,7 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
     distance: 0,
     gameOver: false,
     theme: level.theme ?? 'factory',
+    mixed: !!level.mixed,
     combo: 0,
     comboMult: 1,
     bestCombo: 0,

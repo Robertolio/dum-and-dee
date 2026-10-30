@@ -74,7 +74,7 @@ const factory: LevelDef[] = [
 }));
 
 const studio: LevelDef[] = [
-  { id: 's1', name: 'Newsroom', blurb: 'Fans, desks and papers', seed: 71, gap: 11, items: [[0, 0.1, 'Welcome to the studio: speakers to jump over'], [14, 0.1, 'Push through the fan: papers fly!'], [1, 0.1], [13, 0.15], [0, 0.2], [15, 0.2, 'Flip the weather map to sunshine'], [2, 0.25], [14, 0.25], [5, 0.3]] },
+  { id: 's1', name: 'Newsroom', blurb: 'Fans, desks and papers', seed: 71, gap: 11, items: [[0, 0.1, 'Now entering: TV Studio. Jump the speakers'], [14, 0.1, 'Push through the fan: papers fly!'], [1, 0.1], [13, 0.15], [0, 0.2], [15, 0.2, 'Flip the weather map to sunshine'], [2, 0.25], [14, 0.25], [5, 0.3]] },
   { id: 's2', name: 'Quiz night', blurb: 'Spin the wheel', seed: 81, gap: 10, items: [[13, 0.3], [1, 0.3], [0, 0.35], [2, 0.35], [15, 0.4], [9, 0.4], [13, 0.4], [4, 0.45], [14, 0.45], [5, 0.5], [3, 0.5]] },
   { id: 's3', name: 'Talk show', blurb: 'Mind the lamps. It gets dark', seed: 91, gap: 9, items: [[1, 0.55], [9, 0.55], [2, 0.6], [15, 0.6], [11, 0.6], [4, 0.65], [13, 0.65], [9, 0.7], [2, 0.7], [14, 0.7], [3, 0.75], [12, 0.75], [5, 0.8], [1, 0.8]] },
 ].map((l) => ({
@@ -86,26 +86,24 @@ const studio: LevelDef[] = [
   data: compose(l.id, 'studio', l.seed, l.items as Item[], 0, l.gap),
 }));
 
-const endlessStudio: LevelDef = {
-  id: 'endless-studio',
-  name: 'Endless Studio',
-  theme: 'studio',
-  endless: true,
-  blurb: 'Run through the studio',
-  data: { id: 'endless-studio', length: 1e9, lamps: [], steps: [], theme: 'studio', generator: { seed: 777001, startX: 16 } },
-};
-
-const endlessFactory: LevelDef = {
-  id: 'endless-factory',
-  name: 'Endless Factory',
+const endless: LevelDef = {
+  id: 'endless',
+  name: 'Endless',
   theme: 'factory',
   endless: true,
-  blurb: 'Run as far as you can',
-  data: ENDLESS_LEVEL,
+  blurb: 'Factory and studio, as far as you can',
+  data: { id: 'endless', length: 1e9, lamps: [], steps: [], theme: 'factory', mixed: true, generator: { seed: 20241029, startX: 16 } },
 };
 
-export const LEVELS: LevelDef[] = [...factory, endlessFactory, ...studio, endlessStudio];
+/** The campaign, in play order: factory levels, then the TV studio. */
+export const CAMPAIGN: LevelDef[] = [...factory, ...studio];
+export const LEVELS: LevelDef[] = [...CAMPAIGN, endless];
+
+export function nextLevel(id: string): LevelDef | undefined {
+  const i = CAMPAIGN.findIndex((l) => l.id === id);
+  return i >= 0 ? CAMPAIGN[i + 1] : undefined;
+}
 
 export function levelById(id: string): LevelDef {
-  return LEVELS.find((l) => l.id === id) ?? endlessFactory;
+  return LEVELS.find((l) => l.id === id) ?? endless;
 }

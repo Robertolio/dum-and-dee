@@ -187,6 +187,9 @@ export interface GenState {
   /** Extra/less spacing after the pattern just emitted (quiet stretches, busy combos). */
   gapScale: number;
   theme: 'factory' | 'studio';
+  mixed: boolean;
+  /** Section captions (gates between themes, commercial breaks) with their x. */
+  marks: { x: number; text: string }[];
 }
 
 export interface LevelResult {
@@ -223,6 +226,7 @@ export interface GameState {
   distance: number;
   gameOver: boolean;
   theme: 'factory' | 'studio';
+  mixed: boolean;
   combo: number;
   comboMult: number;
   bestCombo: number;

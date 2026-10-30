@@ -1,13 +1,8 @@
-import { LEVELS, type LevelDef } from '@dd/sim';
+import { CAMPAIGN, levelById, nextLevel, type LevelDef } from '@dd/sim';
 import type { GameScene } from '../scenes/GameScene';
 import { sfx } from '../audio/sfx';
 import { loadProgress, recordEndless, recordLevel } from '../progress';
 import { keepScreenOn } from '../platform/wakelock';
-
-const THEMES: Array<{ id: 'factory' | 'studio'; title: string }> = [
-  { id: 'factory', title: 'Factory' },
-  { id: 'studio', title: 'TV Studio' },
-];
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -58,20 +53,24 @@ export class Screens {
     this.scene.startLevel(def);
   }
 
-  showMenu(): void {
+  private continueDef(): LevelDef {
+    const p = loadProgress();
+    const open = CAMPAIGN.find((l) => !p.levels[l.id]);
+    return open ?? CAMPAIGN[CAMPAIGN.length - 1]!;
+  }
+
+  showMenu(levels = false): void {
     keepScreenOn();
     const p = loadProgress();
     this.scene.paused = true;
     this.result.classList.add('hidden');
     this.menu.replaceChildren();
     const card = el('div', 'card');
-    card.append(el('h2', '', 'Choose a level'));
-    for (const th of THEMES) {
-      const defs = LEVELS.filter((l) => l.theme === th.id);
-      if (defs.length === 0) continue;
-      card.append(el('h3', '', th.title));
+    const running = this.scene.state.tick > 30 && !this.scene.state.gameOver && !this.scene.state.finished;
+    if (levels) {
+      card.append(el('h2', '', 'Levels'));
       const row = el('div', 'levels');
-      for (const d of defs.filter((l) => !l.endless)) {
+      for (const d of CAMPAIGN) {
         const b = el('button', 'level');
         b.dataset.testid = `level-${d.id}`;
         const rec = p.levels[d.id];
@@ -82,26 +81,54 @@ export class Screens {
         });
         row.append(b);
       }
-      for (const d of defs.filter((l) => l.endless)) {
-        const b = el('button', 'level endless');
-        b.dataset.testid = `level-${d.id}`;
-        const rec = p.endless[d.id];
-        b.append(el('b', '', '∞ ' + d.name), el('span', 'stars', rec ? `${rec.bestDistance} m` : 'distance'), el('small', '', rec ? `Best score ${rec.bestScore}` : d.blurb));
-        b.addEventListener('click', () => {
-          sfx.click();
-          this.start(d);
-        });
-        row.append(b);
-      }
       card.append(row);
+      const back = el('button', 'plain', 'Back');
+      back.dataset.testid = 'levels-back';
+      back.addEventListener('click', () => {
+        sfx.click();
+        this.showMenu();
+      });
+      card.append(back);
+      this.menu.append(card);
+      this.menu.classList.remove('hidden');
+      return;
     }
-    const resume = el('button', 'plain', 'Resume');
-    resume.dataset.testid = 'menu-resume';
-    resume.addEventListener('click', () => {
+    card.append(el('h2', '', 'Dum & Dee'));
+    const cont = this.continueDef();
+    const started = !!p.levels[CAMPAIGN[0]!.id] || Object.keys(p.levels).length > 0;
+    const play = el('button', 'primary big', started ? 'Continue' : 'Play');
+    play.dataset.testid = 'btn-play';
+    play.append(el('small', '', started ? cont.name : CAMPAIGN[0]!.name));
+    play.addEventListener('click', () => {
       sfx.click();
-      this.hideAll();
+      this.start(started ? cont : CAMPAIGN[0]!);
     });
-    if (this.scene.state.tick > 30 && !this.scene.state.gameOver && !this.scene.state.finished) card.append(resume);
+    const endless = levelById('endless');
+    const er = p.endless[endless.id];
+    const inf = el('button', 'big', '∞ Endless');
+    inf.dataset.testid = 'btn-endless';
+    inf.append(el('small', '', er ? `Best ${er.bestDistance} m` : 'Factory and studio'));
+    inf.addEventListener('click', () => {
+      sfx.click();
+      this.start(endless);
+    });
+    card.append(play, inf);
+    if (running) {
+      const resume = el('button', 'plain', 'Resume');
+      resume.dataset.testid = 'menu-resume';
+      resume.addEventListener('click', () => {
+        sfx.click();
+        this.hideAll();
+      });
+      card.append(resume);
+    }
+    const lv = el('button', 'link', 'Levels');
+    lv.dataset.testid = 'btn-levels';
+    lv.addEventListener('click', () => {
+      sfx.click();
+      this.showMenu(true);
+    });
+    card.append(lv);
     this.menu.append(card);
     this.menu.classList.remove('hidden');
   }
@@ -114,8 +141,7 @@ export class Screens {
     let next: LevelDef | undefined;
     if (kind === 'complete' && s.result) {
       recordLevel(def.id, s.result.stars, s.result.score);
-      const idx = LEVELS.indexOf(def);
-      next = LEVELS.slice(idx + 1).find((l) => l.theme === def.theme && !l.endless);
+      next = nextLevel(def.id);
       card.append(el('h2', '', 'Level complete!'), el('div', 'bigstars', starsText(s.result.stars)));
       const r = s.result;
       card.append(
@@ -130,7 +156,7 @@ export class Screens {
     }
     const row = el('div', 'buttons');
     if (next) {
-      const nb = el('button', 'primary', 'Next level');
+      const nb = el('button', 'primary', next.theme !== def.theme ? `Next: ${next.name} (TV Studio)` : 'Next level');
       nb.dataset.testid = 'btn-next';
       nb.addEventListener('click', () => {
         sfx.click();

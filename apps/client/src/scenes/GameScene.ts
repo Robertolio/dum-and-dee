@@ -6,6 +6,9 @@ import {
   lampCapCenter,
   ladderHeightAt,
   levelById,
+  MIXED_ZONE,
+  nextLevel,
+  themeAtX,
   type LevelDef,
   advanceWalk,
   createWalkAnim,
@@ -33,10 +36,12 @@ const FONT = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 
 export class GameScene extends Phaser.Scene {
   state!: GameState;
-  levelDef: LevelDef = levelById('endless-factory');
+  levelDef: LevelDef = levelById('endless');
   paused = false;
   onEnd: ((kind: 'gameover' | 'complete') => void) | null = null;
   private hintsShown = new Set<number>();
+  private curTheme: 'factory' | 'studio' = 'factory';
+  private gateText: Phaser.GameObjects.Text | null = null;
   private bannerText: Phaser.GameObjects.Text | null = null;
   tuning: Tuning = cloneTuning(DEFAULT_TUNING);
   controller!: Controller;
@@ -293,6 +298,7 @@ export class GameScene extends Phaser.Scene {
   startLevel(def: LevelDef): void {
     this.levelDef = def;
     this.paused = false;
+    this.curTheme = themeAtX(!!def.data.mixed, def.theme, 0);
     this.applyTheme();
     this.reset();
   }
@@ -734,8 +740,9 @@ export class GameScene extends Phaser.Scene {
 
   /** Studio set dressing: news desk, quiz set and talk-show couch in turn, with cameras and cameramen around them. */
   private syncDecor(): void {
-    if (this.levelDef.theme !== 'studio') return;
     const view = this.view;
+    const mixed = !!this.levelDef.data.mixed;
+    if (!mixed && this.curTheme !== 'studio') return;
     const zoneLen = 70;
     const first = Math.floor((view.camX - 6) / zoneLen);
     const last = Math.floor((view.camX + this.scale.width / PX + 6) / zoneLen);
@@ -755,6 +762,7 @@ export class GameScene extends Phaser.Scene {
     };
     for (let z = Math.max(0, first); z <= last; z++) {
       const cx = z * zoneLen + 38;
+      if (mixed && themeAtX(true, 'factory', cx) !== 'studio') continue;
       put(`set${z}`, sets[z % 3]!, cx, 320, 220);
       put(`cam${z}a`, 'camera', cx - 9, 80, 110);
       if (this.quality === 0) put(`man${z}a`, 'cameraman', cx - 11.2, 80, 110);
@@ -822,13 +830,61 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private applyTheme(): void {
+  private syncTheme(): void {
+    const d = this.levelDef.data;
+    if (!d.mixed) return;
+    const front = Math.max(this.state.players[0].x, this.state.players[1].x);
+    const th = themeAtX(true, 'factory', front + 1);
+    if (th === this.curTheme) return;
+    this.curTheme = th;
+    this.applyTheme(false);
+    this.cameras.main.flash(260, 255, 255, 255);
+    this.banner(th === 'studio' ? 'Now entering: TV Studio' : 'Back to the Factory', '#ffd36b', 1800);
+  }
+
+  private gates(): Array<{ x: number; to: 'factory' | 'studio' }> {
+    const d = this.levelDef.data;
+    const out: Array<{ x: number; to: 'factory' | 'studio' }> = [];
+    if (d.mixed) {
+      const z0 = Math.max(1, Math.floor(this.view.camX / MIXED_ZONE));
+      for (let z = z0; z <= z0 + 1; z++) out.push({ x: z * MIXED_ZONE, to: z % 2 === 1 ? 'studio' : 'factory' });
+    } else {
+      const nx = nextLevel(this.levelDef.id);
+      if (nx && nx.theme !== this.levelDef.theme && d.length < 1e8) out.push({ x: d.length - 1, to: nx.theme });
+    }
+    return out;
+  }
+
+  private drawGates(): void {
+    const g = this.gProps;
+    let label: { sx: number; text: string } | null = null;
+    for (const gate of this.gates()) {
+      const sx = this.view.sx(gate.x);
+      if (sx < -200 || sx > this.scale.width + 200) continue;
+      const studio = gate.to === 'studio';
+      const col = studio ? 0xb03a5c : 0xd8a62a;
+      g.fillStyle(0x2b2f36);
+      g.fillRect(sx - 90, FLOOR_Y - 250, 22, 250);
+      g.fillRect(sx + 68, FLOOR_Y - 250, 22, 250);
+      g.fillStyle(col);
+      g.fillRect(sx - 100, FLOOR_Y - 290, 200, 46);
+      g.fillStyle(0xffffff, 0.12);
+      g.fillRect(sx - 68, FLOOR_Y - 244, 136, 244);
+      label = { sx, text: studio ? 'TV STUDIO' : 'FACTORY' };
+    }
+    if (!this.gateText) this.gateText = this.add.text(0, 0, '', { fontFamily: 'sans-serif', fontSize: '24px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(7);
+    this.gateText.setVisible(!!label);
+    if (label) this.gateText.setText(label.text).setPosition(label.sx, FLOOR_Y - 267);
+  }
+
+  private applyTheme(clear = true): void {
     if (!this.layers) return;
-    const studio = this.levelDef.theme === 'studio';
+    const studio = this.curTheme === 'studio';
     this.layers.wall.setTexture(studio ? 'studio-wall' : 'wall');
     this.layers.pipes.setTexture(studio ? 'studio-top' : 'pipes');
     this.layers.floor.setTexture(studio ? 'studio-floor' : 'floor');
     this.layers.ceiling.setTexture(studio ? 'studio-ceiling' : 'ceiling');
+    if (!clear) return;
     for (const img of this.lampSprites.values()) img.destroy();
     this.lampSprites.clear();
     for (const img of this.stepSprites.values()) img.destroy();
@@ -859,7 +915,9 @@ export class GameScene extends Phaser.Scene {
 
     this.updateCameraLayers();
 
+    this.syncTheme();
     this.syncProps();
+    this.drawGates();
     this.syncSofts();
     g.clear();
 
@@ -882,7 +940,7 @@ export class GameScene extends Phaser.Scene {
       g.fillCircle(px, py, 6);
       let img = this.lampSprites.get(l.id);
       if (!img) {
-        img = this.add.image(0, 0, meat ? l.kind : this.levelDef.theme === 'studio' ? 'studio-cap' : 'lamp-cap').setOrigin(0.5, 0).setDepth(12);
+        img = this.add.image(0, 0, meat ? l.kind : this.curTheme === 'studio' ? 'studio-cap' : 'lamp-cap').setOrigin(0.5, 0).setDepth(12);
         if (meat) img.setDisplaySize(l.radius * 2 * PX * 1.05, l.radius * 2 * PX * 1.2);
         this.lampSprites.set(l.id, img);
       }

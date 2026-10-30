@@ -20,6 +20,12 @@ export interface LevelGenerator {
   /** x of the first generated pattern. */
   startX: number;
 }
+export const MIXED_ZONE = 260;
+export function themeAtX(mixed: boolean, base: 'factory' | 'studio', x: number): 'factory' | 'studio' {
+  if (!mixed) return base;
+  return Math.floor(Math.max(0, x) / MIXED_ZONE) % 2 === 0 ? 'factory' : 'studio';
+}
+
 export type LevelHint = { x: number; text: string };
 export interface LevelData {
   id: string;
@@ -34,6 +40,8 @@ export interface LevelData {
   /** Par time (s) for the level-end time bonus. */
   par?: number;
   theme?: 'factory' | 'studio';
+  /** Endless mixing: the theme alternates every MIXED_ZONE we. */
+  mixed?: boolean;
   /** Endless procedural generation ahead of the ladder. */
   generator?: LevelGenerator;
 }
@@ -178,6 +186,8 @@ export function createGen(level: LevelData, existingLamps: number, existingSteps
     last2: -1,
     gapScale: 1,
     theme: level.theme ?? 'factory',
+    mixed: !!level.mixed,
+    marks: [],
   };
 }
 
@@ -284,6 +294,13 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
   const r = rand(g);
   const r2 = rand(g);
   g.patterns += 1;
+  if (g.mixed) {
+    const th = themeAtX(true, 'factory', x + 6);
+    if (th !== g.theme) {
+      g.theme = th;
+      g.marks.push({ x: Math.floor((x + 6) / MIXED_ZONE) * MIXED_ZONE, text: th === 'studio' ? 'Now entering: TV Studio' : 'Back to the Factory' });
+    }
+  }
   // The first few patterns are gentle: single obstacles.
   if (g.patterns <= 2) {
     if (g.patterns === 1) addLamp(s, g, t, x, 'lamp');
@@ -414,6 +431,7 @@ export function extendLevel(s: { gen: GenState | null; steps: StepObstacle[]; la
     const d = difficultyAt(g.nextX);
     g.nextX += len + (lerp(10, 6.5, d) + rand(g) * 3) * g.gapScale;
   }
+  if (g.marks.length > 6) g.marks = g.marks.slice(-4);
   const keep = ladderX - 14;
   if (s.steps.length > 0 && s.steps[0]!.x1 < keep) s.steps = s.steps.filter((o) => o.x1 >= keep);
   if (s.softs.length > 0 && s.softs[0]!.x < keep) s.softs = s.softs.filter((o) => o.x >= keep);
