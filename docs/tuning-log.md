@@ -97,3 +97,13 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 
 ## Round: phone finish
 - Wake Lock on play, iOS Add-to-Home-Screen tip (dismissible, remembered), notch safe-area insets for HUD, animated rotate notice, particle caps (maxAliveParticles) and adaptive quality (fps<48 for 3 s: half particles, no light cones/cameramen; <25% at level 2; recovers after 12 s above 58 fps). No texture atlas yet (SVGs rasterised per sprite at load).
+
+## Round: one campaign, two-button menu, richer TV studio
+- Campaign = f0..f5 then s1..s5 (`CAMPAIGN`, `nextLevel`); level end offers "Next", labelled "(TV Studio)" at the factory-to-studio border; a gate with a TV STUDIO label stands at the end of f5; s1 opens with the banner "Now entering: TV Studio".
+- Main menu: Play (Continue + level name once progress exists; resumes at first unfinished level) and Endless; small "Levels" link for the level list. One Endless: `mixed` generator, theme alternates every MIXED_ZONE = 260 we (factory, studio, ...), a gate, flash and banner at each border; backdrop, lamp caps, decor follow the zone. `ENDLESS_LEVEL` (factory only) stays for sim tests.
+- New studio floor props: clapper (0.3), director's chair (0.6), popcorn cart (0.7, heavy), dummy doll (0.55), soundboard (0.45); cable (0.1, slip like a banana); red carpet (walk it: +40 glam).
+- New soft set pieces (ladder passes through): ON AIR sign +60, APPLAUSE sign +80, buzzer +100, break-away set wall +50 but -5 water (falls over). Tuning: scoreOnAir/Applause/Buzzer/Wall/Carpet.
+- Generator kinds 16-21 (studio only): commercial break (fast: 4 props/cable/buzzer/ON AIR at 3.1-3.5 we spacing, banner "COMMERCIAL BREAK!"), red carpet + applause, wall + buzzer, soundboard + applause high up, clapper + ON AIR + cable, dummy/cable/dummy. Studio weights rebalanced (fewer web/balloon/quiet, more props).
+- Levels s2/s3 reworked with the new patterns; s4 "Live broadcast" and s5 "Season finale" added (difficulty 0.7-1.0).
+- Studio extras: scrolling news ticker on the floor band, teleprompter next to the news set.
+- Newsreader: original bearded man in a dark suit with tie, flat style, replaces the generic presenter in news-desk.svg (no portrait of a real person).

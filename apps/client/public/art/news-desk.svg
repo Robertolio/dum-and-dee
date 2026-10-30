@@ -7,5 +7,18 @@
   <rect x="40" y="150" width="240" height="64" rx="8" fill="#e8e4f4" stroke="#5b4a8a" stroke-width="4"/>
   <rect x="40" y="150" width="240" height="14" rx="6" fill="#43b5d9" stroke="#5b4a8a" stroke-width="4"/>
   <circle cx="160" cy="190" r="14" fill="#d03a3a"/>
-  <g transform="translate(150 98)"><rect x="-14" y="22" width="28" height="30" rx="6" fill="#2f6fd0" stroke="#10285a" stroke-width="3"/><circle cx="0" cy="8" r="14" fill="#f2c7a0" stroke="#10285a" stroke-width="3"/><path d="M-14 4 Q0 -14 14 4 Q0 -2 -14 4Z" fill="#5a3b1d"/><circle cx="5" cy="9" r="2" fill="#222"/><rect x="-18" y="46" width="22" height="8" fill="#fffdf4" stroke="#b8b09a" stroke-width="1.5"/></g>
+  <g transform="translate(160 150)" stroke="#1a1c24" stroke-width="3" stroke-linejoin="round">
+    <path d="M-34 0 L-30 -34 Q-24 -46 -10 -48 L10 -48 Q24 -46 30 -34 L34 0 Z" fill="#2c3342"/>
+    <path d="M-9 -48 L0 -30 L9 -48 Z" fill="#fffdf4" stroke-width="2"/>
+    <path d="M-3 -40 L3 -40 L5 -22 L0 -17 L-5 -22 Z" fill="#c8323c" stroke-width="2"/>
+    <path d="M-10 -48 L-20 -28 L-6 -20 L0 -30 Z M10 -48 L20 -28 L6 -20 L0 -30 Z" fill="#242a38" stroke-width="2"/>
+    <rect x="-6" y="-56" width="12" height="10" fill="#e6b88f"/>
+    <ellipse cx="0" cy="-70" rx="17" ry="19" fill="#f2c7a0"/>
+    <path d="M-17 -72 Q-18 -92 0 -92 Q18 -92 17 -72 Q10 -82 0 -80 Q-10 -82 -17 -72 Z" fill="#3b2a1b" stroke-width="2"/>
+    <path d="M-17 -68 Q-19 -44 0 -42 Q19 -44 17 -68 Q14 -56 6 -55 Q0 -52 -6 -55 Q-14 -56 -17 -68 Z" fill="#4a3322" stroke-width="2"/>
+    <path d="M-5 -58 Q0 -55 5 -58" fill="none" stroke="#f2c7a0" stroke-width="2.5"/>
+    <circle cx="-7" cy="-71" r="2" fill="#1a1c24" stroke="none"/><circle cx="7" cy="-71" r="2" fill="#1a1c24" stroke="none"/>
+    <path d="M-11 -77 L-4 -76 M11 -77 L4 -76" stroke="#3b2a1b" stroke-width="2.5" fill="none"/>
+    <rect x="-24" y="-6" width="30" height="8" fill="#fffdf4" stroke="#b8b09a" stroke-width="1.5"/>
+  </g>
 </svg>
