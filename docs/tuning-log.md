@@ -94,3 +94,6 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 ## Round: score/levels/studio
 - Combo x1.5/2/3 at 3/6/10 clean passes (props passed without bump, lamps, balloons, webs); +25 per clean prop pass; extra life every 2000 (max 5); checkpoints every 60 we on a clear spot, respawn with a fresh bucket; level-end bonuses (water x5, lives x500, time) and 1-3 stars.
 - Levels: tutorial + 5 factory levels (60-120 s) from fixed pattern lists; Endless Factory; TV Studio s1-s3 and Endless Studio (new props, boom mics, wheel/fan/weather set pieces).
+
+## Round: phone finish
+- Wake Lock on play, iOS Add-to-Home-Screen tip (dismissible, remembered), notch safe-area insets for HUD, animated rotate notice, particle caps (maxAliveParticles) and adaptive quality (fps<48 for 3 s: half particles, no light cones/cameramen; <25% at level 2; recovers after 12 s above 58 fps). No texture atlas yet (SVGs rasterised per sprite at load).

@@ -2,6 +2,7 @@ import { LEVELS, type LevelDef } from '@dd/sim';
 import type { GameScene } from '../scenes/GameScene';
 import { sfx } from '../audio/sfx';
 import { loadProgress, recordEndless, recordLevel } from '../progress';
+import { keepScreenOn } from '../platform/wakelock';
 
 const THEMES: Array<{ id: 'factory' | 'studio'; title: string }> = [
   { id: 'factory', title: 'Factory' },
@@ -52,11 +53,13 @@ export class Screens {
 
   start(def: LevelDef): void {
     sfx.unlock();
+    keepScreenOn();
     this.hideAll();
     this.scene.startLevel(def);
   }
 
   showMenu(): void {
+    keepScreenOn();
     const p = loadProgress();
     this.scene.paused = true;
     this.result.classList.add('hidden');

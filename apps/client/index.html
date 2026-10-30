@@ -246,6 +246,54 @@
         font-size: 16px;
         padding: 0;
       }
+      #a2hs {
+        position: fixed;
+        left: 50%;
+        top: max(6px, env(safe-area-inset-top));
+        transform: translateX(-50%);
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        max-width: min(520px, 90vw);
+        padding: 8px 12px;
+        border-radius: 12px;
+        background: rgba(255, 211, 107, 0.95);
+        color: #1b1b1b;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      #a2hs button {
+        border: 0;
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        flex: none;
+        font-size: 14px;
+      }
+      #inset-probe {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 0;
+        height: 0;
+        visibility: hidden;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      }
+      #rotate .phone {
+        display: block;
+        width: 54px;
+        height: 90px;
+        margin: 0 auto 16px;
+        border: 5px solid #fff;
+        border-radius: 12px;
+        animation: turn 2.2s ease-in-out infinite;
+      }
+      @keyframes turn {
+        0%, 20% { transform: rotate(0deg); }
+        60%, 100% { transform: rotate(-90deg); }
+      }
       #start-btn {
         background: #3fb768;
         color: #0b2411;
@@ -414,7 +462,8 @@
         <p class="hint" id="start-hint"></p>
       </div>
     </div>
-    <div id="rotate">Rotate your phone to landscape to play Dum &amp; Dee.</div>
+    <div id="inset-probe"></div>
+    <div id="rotate"><div><span class="phone"></span>Rotate your phone to landscape to play Dum &amp; Dee.</div></div>
     <button id="debug-toggle" type="button" aria-label="Debug panel" title="Debug panel">&#9881;</button>
     <div id="debug" aria-label="Debug panel"></div>
     <script type="module" src="/src/main.ts"></script>

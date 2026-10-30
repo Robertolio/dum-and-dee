@@ -14,6 +14,8 @@ export class Hud {
   private readonly nameDum: Phaser.GameObjects.Text;
   private readonly nameDee: Phaser.GameObjects.Text;
   private width: number;
+  private insetL = 0;
+  private insetR = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -33,15 +35,21 @@ export class Hud {
     this.nameDee = scene.add.text(26, 101, STRINGS.dee, nameStyle).setOrigin(0.5, 0).setDepth(52);
   }
 
-  resize(width: number): void {
+  resize(width: number, insetL = 0, insetR = 0): void {
     this.width = width;
-    this.waterText.setX(width - 26);
+    this.insetL = insetL;
+    this.insetR = insetR;
   }
 
   draw(s: GameState, _t: Tuning): void {
     const g = this.g;
-    const W = this.width;
+    const L = this.insetL;
+    const W = this.width - L - this.insetR;
     g.clear();
+    g.x = L;
+    this.scoreText.setX(62 + L);
+    this.comboText.setX(176 + L);
+    this.waterText.setX(W + L - 26);
 
     // Score panel
     panel(g, 14, 12, 150, 38);
@@ -72,8 +80,8 @@ export class Hud {
       g.fillStyle(0xffffff, 0.6);
       g.fillRect(50 + 86 * 0.8 - 1, y + 4, 2, 14);
     }
-    this.nameDum.setPosition(27, 75);
-    this.nameDee.setPosition(27, 117);
+    this.nameDum.setPosition(27 + L, 75);
+    this.nameDee.setPosition(27 + L, 117);
 
     // Balance level (tension), centre top
     const bw = 240;

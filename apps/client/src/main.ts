@@ -6,6 +6,8 @@ import { mountStartScreen } from './ui/start';
 import { Screens } from './ui/screens';
 import { levelById } from '@dd/sim';
 import { mountAudioButtons } from './audio/sfx';
+import { installWakeLockRecovery } from './platform/wakelock';
+import { mountInstallTip } from './platform/install';
 import type { PlayerInput } from '@dd/sim';
 
 const width = computeGameWidth(window.innerWidth, window.innerHeight);
@@ -43,6 +45,8 @@ game.events.once(Phaser.Core.Events.READY, () => {
   const mount = (): void => {
     mountDebugPanel(scene);
     mountAudioButtons();
+    installWakeLockRecovery();
+    mountInstallTip();
     exposeTestHooks(scene);
     const screens = new Screens(scene);
     mountStartScreen(scene, screens);
@@ -64,6 +68,7 @@ function exposeTestHooks(scene: GameScene): void {
     setInputOverride: (inputs: [PlayerInput, PlayerInput] | null) => scene.controller.setOverride(inputs),
     lastInputs: () => scene.lastInputs,
     reset: () => scene.reset(),
+    quality: () => scene.quality,
     startLevel: (id: string) => scene.startLevel(levelById(id)),
     say: (p: 0 | 1, text: string) => scene.speech.say(p, text, 'urgent'),
   };

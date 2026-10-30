@@ -75,6 +75,9 @@ export class GameScene extends Phaser.Scene {
   private hintText!: Phaser.GameObjects.Text;
   private zoneLabels: Phaser.GameObjects.Text[] = [];
   private overlay: Phaser.GameObjects.Container | null = null;
+  quality = 0;
+  private lowFpsT = 0;
+  private highFpsT = 0;
   private oof: [number, number] = [0, 0];
   private shake = 0;
   private fpsSmoothed = 60;
@@ -166,6 +169,7 @@ export class GameScene extends Phaser.Scene {
     dot.generateTexture('dot', 8, 8);
     dot.destroy();
     this.splash = this.add.particles(0, 0, 'dot', {
+      maxAliveParticles: 90,
       speed: { min: 60, max: 220 },
       angle: { min: 200, max: 340 },
       gravityY: 600,
@@ -176,6 +180,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.splash.setDepth(15);
     this.sparks = this.add.particles(0, 0, 'dot', {
+      maxAliveParticles: 120,
       speed: { min: 80, max: 260 },
       angle: { min: 0, max: 360 },
       gravityY: 300,
@@ -186,6 +191,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.sparks.setDepth(16);
     this.confetti = this.add.particles(0, 0, 'dot', {
+      maxAliveParticles: 160,
       speed: { min: 80, max: 300 },
       angle: { min: 0, max: 360 },
       gravityY: 500,
@@ -195,10 +201,11 @@ export class GameScene extends Phaser.Scene {
       emitting: false,
     });
     this.confetti.setDepth(17);
-    this.papers = this.add.particles(0, 0, 'paper', { lifespan: 2400, speed: { min: 70, max: 240 }, angle: { min: -120, max: -10 }, gravityY: 55, rotate: { start: 0, end: 540 }, scale: { start: 1.2, end: 0.9 }, alpha: { start: 1, end: 0 }, emitting: false });
+    this.papers = this.add.particles(0, 0, 'paper', { lifespan: 2400, speed: { min: 70, max: 240 }, angle: { min: -120, max: -10 }, gravityY: 55, rotate: { start: 0, end: 540 }, scale: { start: 1.2, end: 0.9 }, alpha: { start: 1, end: 0 }, emitting: false, maxAliveParticles: 80 });
     this.papers.setDepth(18);
 
     this.hud = new Hud(this, W);
+    this.hud.resize(W, ...this.measureInsets());
     this.speech = new Speech(this);
     this.speech.onSay = (p, text) => sfx.mumble(p, text.length);
 
@@ -314,13 +321,21 @@ export class GameScene extends Phaser.Scene {
     this.controller.setScale(this.scale.width / Math.max(1, rect.width));
   }
 
+  private measureInsets(): [number, number] {
+    const probe = document.getElementById('inset-probe');
+    if (!probe) return [0, 0];
+    const cs = getComputedStyle(probe);
+    const k = this.scale.width / Math.max(1, window.innerWidth);
+    return [(parseFloat(cs.paddingLeft) || 0) * k, (parseFloat(cs.paddingRight) || 0) * k];
+  }
+
   private onResize(): void {
     const W = this.scale.width;
     this.view.width = W;
     if (this.layers) {
       for (const l of Object.values(this.layers)) l.setSize(W, l.height);
     }
-    this.hud.resize(W);
+    this.hud.resize(W, ...this.measureInsets());
     this.hintText.setX(W / 2);
     this.refreshHints();
     this.updateInputScale();
@@ -341,6 +356,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.fpsSmoothed += (1000 / Math.max(1, deltaMs) - this.fpsSmoothed) * 0.05;
     this.updateInputScale();
+    this.adaptQuality(dt);
     this.accumulator += dt;
     const h = this.tuning.dt;
     let steps = 0;
@@ -432,7 +448,7 @@ export class GameScene extends Phaser.Scene {
           sfx.thud(near?.kind !== 'lamp');
           if (e.type === 'lampHit') this.speech.say(this.nearestPlayer(e.x), 'Ouch!', 'hint');
           sfx.splash(e.value ?? 4);
-          this.sparks.explode(e.type === 'lampHit' ? 18 : 8, sx, sy + 30);
+          this.burst(this.sparks, e.type === 'lampHit' ? 18 : 8, sx, sy + 30);
           this.splashAt(e.type === 'lampHit' ? 20 : 10);
           this.oof = [0.6, 0.6];
           this.shake = 0.2;
@@ -449,7 +465,7 @@ export class GameScene extends Phaser.Scene {
         case 'lampBreak':
           sfx.glassBreak();
           sfx.splash(e.value ?? 8);
-          this.sparks.explode(40, sx, sy + 20);
+          this.burst(this.sparks, 40, sx, sy + 20);
           this.splashAt(16);
           this.shake = 0.35;
           this.oof = [0.6, 0.6];
@@ -461,7 +477,7 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'pop':
           sfx.pop();
-          this.confetti.explode(34, sx, sy);
+          this.burst(this.confetti, 34, sx, sy);
           this.floatText(sx, sy - 24, `+${e.value}`, '#ffd36b');
           break;
         case 'spin': {
@@ -476,7 +492,7 @@ export class GameScene extends Phaser.Scene {
           const f = this.state.softs.find((o) => o.kind === 'fan' && Math.abs(o.x - (e.x ?? 0)) < 0.01);
           if (f) this.softAnim.set(f.id, { spin: 40, angle: this.softAnim.get(f.id)?.angle ?? 0 });
           sfx.whoosh();
-          this.papers.explode(26, sx + 30, sy - 10);
+          this.burst(this.papers, 26, sx + 30, sy - 10);
           this.floatText(sx, sy - 60, `+${e.value}`, '#dff3f5');
           this.speech.say(null, 'My notes!', 'urgent');
           break;
@@ -484,7 +500,7 @@ export class GameScene extends Phaser.Scene {
         case 'flip':
           sfx.cheer();
           this.floatText(sx, sy - 60, `+${e.value}`, '#ffd36b');
-          this.confetti.explode(16, sx, sy);
+          this.burst(this.confetti, 16, sx, sy);
           this.speech.say(null, 'Sunshine!', 'cheer');
           break;
         case 'sweep':
@@ -513,7 +529,7 @@ export class GameScene extends Phaser.Scene {
           this.speech.say(this.nearestPlayer(e.x), 'Ouch!', 'urgent');
           sfx.splash(e.value ?? 8);
           this.floatText(sx, this.view.sy(e.y ?? 2) + 30, STRINGS.bonk, '#ffd36b');
-          this.sparks.explode(12, sx, this.view.sy(e.y ?? 2));
+          this.burst(this.sparks, 12, sx, this.view.sy(e.y ?? 2));
           this.splashAt(10);
           this.oof = [0.6, 0.6];
           this.shake = 0.3;
@@ -540,7 +556,7 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'levelDone':
           sfx.cheer();
-          this.confetti.explode(60, this.scale.width / 2, 120);
+          this.burst(this.confetti, 60, this.scale.width / 2, 120);
           this.time.delayedCall(1200, () => this.onEnd?.('complete'));
           break;
         case 'comboUp':
@@ -556,7 +572,7 @@ export class GameScene extends Phaser.Scene {
         case 'extraLife':
           sfx.cheer();
           this.banner('Extra life!', '#ff8da1', 1300);
-          this.confetti.explode(30, this.scale.width - 80, 40);
+          this.burst(this.confetti, 30, this.scale.width - 80, 40);
           break;
         case 'checkpoint':
           this.floatText(this.scale.width / 2, 150, 'Checkpoint', '#9fd9df');
@@ -575,7 +591,7 @@ export class GameScene extends Phaser.Scene {
     const B = this.state.bucket;
     const bx = this.view.sx(B.xP) + Math.sin(B.phi) * this.tuning.bucketL * PX;
     const by = this.view.sy(B.yP) + Math.cos(B.phi) * this.tuning.bucketL * PX;
-    this.splash.explode(n, bx, by + 12);
+    this.burst(this.splash, n, bx, by + 12);
   }
 
   private floatText(x: number, y: number, text: string, color: string): void {
@@ -584,6 +600,31 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(40);
     this.tweens.add({ targets: t, y: y - 50, alpha: 0, duration: 1100, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
+  }
+
+  private burst(e: Phaser.GameObjects.Particles.ParticleEmitter, n: number, x: number, y: number): void {
+    const f = [1, 0.5, 0.25][this.quality] ?? 0.25;
+    e.explode(Math.max(1, Math.round(n * f)), x, y);
+  }
+
+  /** Adaptive quality: drop particles and light cones when the frame rate stays low, recover when it is healthy again. */
+  private adaptQuality(dt: number): void {
+    if (this.fpsSmoothed < 48) {
+      this.lowFpsT += dt;
+      this.highFpsT = 0;
+    } else if (this.fpsSmoothed > 58) {
+      this.highFpsT += dt;
+      this.lowFpsT = 0;
+    } else {
+      this.lowFpsT = this.highFpsT = 0;
+    }
+    if (this.lowFpsT > 3 && this.quality < 2) {
+      this.quality += 1;
+      this.lowFpsT = 0;
+    } else if (this.highFpsT > 12 && this.quality > 0) {
+      this.quality -= 1;
+      this.highFpsT = 0;
+    }
   }
 
   private banner(text: string, color: string, ms: number): void {
@@ -716,9 +757,9 @@ export class GameScene extends Phaser.Scene {
       const cx = z * zoneLen + 38;
       put(`set${z}`, sets[z % 3]!, cx, 320, 220);
       put(`cam${z}a`, 'camera', cx - 9, 80, 110);
-      put(`man${z}a`, 'cameraman', cx - 11.2, 80, 110);
+      if (this.quality === 0) put(`man${z}a`, 'cameraman', cx - 11.2, 80, 110);
       put(`cam${z}b`, 'camera', cx + 10, 80, 110, true);
-      put(`man${z}b`, 'cameraman', cx + 12.2, 80, 110, true);
+      if (this.quality === 0) put(`man${z}b`, 'cameraman', cx + 12.2, 80, 110, true);
     }
     for (const [k, img] of this.decor) {
       if (!live.has(k)) {
@@ -848,7 +889,7 @@ export class GameScene extends Phaser.Scene {
       img.setPosition(topX, topY).setRotation(-l.psi);
       if (!meat && l.broken) {
         img.setTint(0x555a60);
-        if (Math.random() < 0.08) this.sparks.explode(2, cx, cy + 14);
+        if (Math.random() < 0.08) this.burst(this.sparks, 2, cx, cy + 14);
         continue;
       }
       if (meat) continue;
@@ -865,6 +906,7 @@ export class GameScene extends Phaser.Scene {
       const reach = Math.max(40, (FLOOR_Y - syp) / Math.max(0.3, dy));
       const fx0 = sxp + dx * reach;
       const fy0 = syp + dy * reach;
+      if (this.quality === 0) {
       g.fillStyle(color, 0.16);
       g.beginPath();
       g.moveTo(sxp - nx * 18, syp - ny * 18);
@@ -873,6 +915,7 @@ export class GameScene extends Phaser.Scene {
       g.lineTo(fx0 - nx * 110, Math.min(FLOOR_Y, fy0 - ny * 110));
       g.closePath();
       g.fillPath();
+      }
       g.fillStyle(0xfff3c0, 0.28);
       g.fillCircle(sxp, syp, 20);
       g.fillStyle(0xfff3c0, 0.5);
