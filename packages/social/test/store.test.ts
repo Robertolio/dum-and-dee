@@ -108,7 +108,9 @@ describe('VAPID keys', () => {
     expect(b.VAPID_PRIVATE_KEY).toBe(a.VAPID_PRIVATE_KEY);
     expect(b.VAPID_SUBJECT).toBe('mailto:me@x.nl');
     const c = await resolveVapid(db, { VAPID_PUBLIC_KEY: 'P', VAPID_PRIVATE_KEY: 'Q' });
-    expect(c).toMatchObject({ source: 'env', VAPID_PUBLIC_KEY: 'P', VAPID_PRIVATE_KEY: 'Q' });
+    expect(c.source).toBe('db');
+    const k = (await import('../src')).generateVapidKeys();
+    expect(await resolveVapid(db, { VAPID_PUBLIC_KEY: k.publicKey, VAPID_PRIVATE_KEY: k.privateKey })).toMatchObject({ source: 'env', VAPID_PUBLIC_KEY: k.publicKey });
   });
   it('works on the pg adapter (pg-mem)', async () => {
     const { newDb } = await import('pg-mem');

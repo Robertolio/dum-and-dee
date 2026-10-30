@@ -128,7 +128,7 @@ Rooms themselves stay in memory (they last minutes); the "rooms link" is `invite
 | `DATABASE_URL` | Postgres connection string (Railway Postgres plugin) |
 | `SQLITE_FILE` | SQLite path when no `DATABASE_URL` (default `./data/dd.sqlite`) |
 | `ADMIN_KEY` | Enables `/api/admin/*` (sent as header `x-admin-key`); unset = endpoints return 404 |
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Optional override for the Web Push keys. If not both set, the server generates a key pair on first start and keeps it in the database (table `settings`), so push works without manual keys |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Optional override for the Web Push keys (invalid values are ignored with a log line and the generated keys are used). If not both set, the server generates a key pair on first start and keeps it in the database (table `settings`), so push works without manual keys |
 | `VAPID_SUBJECT` | Optional contact for push services; default `mailto:admin@example.invalid` |
 
 Note: the generated keys live in the database. With the SQLite fallback on Railway they vanish on every deploy (and every browser subscription with them), so push is only stable once Postgres is attached.

@@ -33,7 +33,8 @@ export function createPushSender(env: Record<string, string | undefined>): PushS
   const subject = env.VAPID_SUBJECT?.trim() || 'mailto:admin@example.com';
   try {
     webpush.setVapidDetails(subject, pub, priv);
-  } catch {
+  } catch (e) {
+    console.error('Web Push disabled:', (e as Error).message);
     return noPush;
   }
   return {
@@ -69,7 +70,14 @@ export async function resolveVapid(db: Db, env: Record<string, string | undefine
   const subject = env.VAPID_SUBJECT?.trim() || DEFAULT_VAPID_SUBJECT;
   const pub = env.VAPID_PUBLIC_KEY?.trim();
   const priv = env.VAPID_PRIVATE_KEY?.trim();
-  if (pub && priv) return { VAPID_PUBLIC_KEY: pub, VAPID_PRIVATE_KEY: priv, VAPID_SUBJECT: subject, source: 'env' };
+  if (pub && priv) {
+    try {
+      webpush.setVapidDetails(subject, pub, priv);
+      return { VAPID_PUBLIC_KEY: pub, VAPID_PRIVATE_KEY: priv, VAPID_SUBJECT: subject, source: 'env' };
+    } catch (e) {
+      console.error('VAPID env settings are invalid, using generated keys instead:', (e as Error).message);
+    }
+  }
   const read = async (): Promise<{ publicKey: string; privateKey: string } | null> => {
     const a = await db.get<{ v: string }>('SELECT v FROM settings WHERE k = ?', ['vapid_public']);
     const b = await db.get<{ v: string }>('SELECT v FROM settings WHERE k = ?', ['vapid_private']);
