@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150">
+  <circle cx="75" cy="75" r="72" fill="#2a2766" stroke="#17163e" stroke-width="4"/>
+  <g stroke="#17163e" stroke-width="2">
+    <path d="M75 75 L75 5 A70 70 0 0 1 124.5 25.5Z" fill="#ff5a5f"/>
+    <path d="M75 75 L124.5 25.5 A70 70 0 0 1 145 75Z" fill="#ffd23f"/>
+    <path d="M75 75 L145 75 A70 70 0 0 1 124.5 124.5Z" fill="#3bceac"/>
+    <path d="M75 75 L124.5 124.5 A70 70 0 0 1 75 145Z" fill="#4ea8de"/>
+    <path d="M75 75 L75 145 A70 70 0 0 1 25.5 124.5Z" fill="#ff5a5f"/>
+    <path d="M75 75 L25.5 124.5 A70 70 0 0 1 5 75Z" fill="#ffd23f"/>
+    <path d="M75 75 L5 75 A70 70 0 0 1 25.5 25.5Z" fill="#b084f5"/>
+    <path d="M75 75 L25.5 25.5 A70 70 0 0 1 75 5Z" fill="#ff9f1c"/>
+  </g>
+  <circle cx="75" cy="75" r="14" fill="#f4f1ea" stroke="#17163e" stroke-width="3"/>
+  <g fill="#f4f1ea"><circle cx="75" cy="6" r="3"/><circle cx="144" cy="75" r="3"/><circle cx="75" cy="144" r="3"/><circle cx="6" cy="75" r="3"/></g>
+</svg>

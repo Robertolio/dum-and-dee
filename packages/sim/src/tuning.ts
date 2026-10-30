@@ -157,6 +157,9 @@ export interface Tuning {
   scoreStepCaught: number;
   scoreBalloon: number;
   scoreWeb: number;
+  scoreWheel: number;
+  scoreFan: number;
+  scoreWeather: number;
   startLives: number;
   maxLives: number;
   extraLifeEvery: number;
@@ -269,6 +272,9 @@ export const DEFAULT_TUNING: Tuning = {
   scoreStepCaught: 50,
   scoreBalloon: 30,
   scoreWeb: 15,
+  scoreWheel: 40,
+  scoreFan: 30,
+  scoreWeather: 40,
   startLives: 3,
   maxLives: 5,
   extraLifeEvery: 2000,

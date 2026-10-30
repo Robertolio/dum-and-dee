@@ -73,6 +73,28 @@ const factory: LevelDef[] = [
   data: compose(l.id, F, l.seed, l.items as Item[], l.par, l.gap),
 }));
 
+const studio: LevelDef[] = [
+  { id: 's1', name: 'Newsroom', blurb: 'Fans, desks and papers', seed: 71, gap: 11, items: [[0, 0.1, 'Welcome to the studio: speakers to jump over'], [14, 0.1, 'Push through the fan: papers fly!'], [1, 0.1], [13, 0.15], [0, 0.2], [15, 0.2, 'Flip the weather map to sunshine'], [2, 0.25], [14, 0.25], [5, 0.3]] },
+  { id: 's2', name: 'Quiz night', blurb: 'Spin the wheel', seed: 81, gap: 10, items: [[13, 0.3], [1, 0.3], [0, 0.35], [2, 0.35], [15, 0.4], [9, 0.4], [13, 0.4], [4, 0.45], [14, 0.45], [5, 0.5], [3, 0.5]] },
+  { id: 's3', name: 'Talk show', blurb: 'Mind the lamps. It gets dark', seed: 91, gap: 9, items: [[1, 0.55], [9, 0.55], [2, 0.6], [15, 0.6], [11, 0.6], [4, 0.65], [13, 0.65], [9, 0.7], [2, 0.7], [14, 0.7], [3, 0.75], [12, 0.75], [5, 0.8], [1, 0.8]] },
+].map((l) => ({
+  id: l.id,
+  name: l.name,
+  theme: 'studio' as const,
+  endless: false,
+  blurb: l.blurb,
+  data: compose(l.id, 'studio', l.seed, l.items as Item[], 0, l.gap),
+}));
+
+const endlessStudio: LevelDef = {
+  id: 'endless-studio',
+  name: 'Endless Studio',
+  theme: 'studio',
+  endless: true,
+  blurb: 'Run through the studio',
+  data: { id: 'endless-studio', length: 1e9, lamps: [], steps: [], theme: 'studio', generator: { seed: 777001, startX: 16 } },
+};
+
 const endlessFactory: LevelDef = {
   id: 'endless-factory',
   name: 'Endless Factory',
@@ -82,7 +104,7 @@ const endlessFactory: LevelDef = {
   data: ENDLESS_LEVEL,
 };
 
-export const LEVELS: LevelDef[] = [...factory, endlessFactory];
+export const LEVELS: LevelDef[] = [...factory, endlessFactory, ...studio, endlessStudio];
 
 export function levelById(id: string): LevelDef {
   return LEVELS.find((l) => l.id === id) ?? endlessFactory;

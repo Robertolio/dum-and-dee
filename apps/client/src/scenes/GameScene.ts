@@ -55,6 +55,9 @@ export class GameScene extends Phaser.Scene {
   private layers: { wall: Phaser.GameObjects.TileSprite; pipes: Phaser.GameObjects.TileSprite; floor: Phaser.GameObjects.TileSprite; ceiling: Phaser.GameObjects.TileSprite } | null = null;
   private stepSprites = new Map<number, Phaser.GameObjects.Image>();
   private softSprites = new Map<number, Phaser.GameObjects.Image>();
+  private softAnim = new Map<number, { spin: number; angle: number }>();
+  private decor = new Map<string, Phaser.GameObjects.Image>();
+  private papers!: Phaser.GameObjects.Particles.ParticleEmitter;
   private confetti!: Phaser.GameObjects.Particles.ParticleEmitter;
   private lampSprites = new Map<number, Phaser.GameObjects.Image>();
   private gProps!: Phaser.GameObjects.Graphics;
@@ -97,6 +100,29 @@ export class GameScene extends Phaser.Scene {
     this.load.svg('meat', 'art/meat.svg', { width: 100, height: 120 });
     this.load.svg('balloon', 'art/balloon.svg', { width: 60, height: 80 });
     this.load.svg('web', 'art/web.svg', { width: 100, height: 100 });
+    const art: Array<[string, number, number]> = [
+      ['studio-wall', 512, 400],
+      ['studio-top', 512, 400],
+      ['studio-floor', 256, 100],
+      ['studio-ceiling', 256, 48],
+      ['speaker', 90, 45],
+      ['studioprop', 110, 50],
+      ['clothes', 100, 40],
+      ['film', 80, 26],
+      ['boom', 100, 120],
+      ['studio-cap', 80, 60],
+      ['wheel', 150, 150],
+      ['fan', 100, 120],
+      ['weather-bad', 120, 120],
+      ['weather-good', 120, 120],
+      ['paper', 16, 20],
+      ['news-desk', 320, 220],
+      ['quiz-set', 320, 220],
+      ['talk-set', 320, 220],
+      ['camera', 110, 150],
+      ['cameraman', 110, 150],
+    ];
+    for (const [k, w, h] of art) this.load.svg(k, `art/${k}.svg`, { width: w, height: h });
     this.load.svg('lamp-cap', 'art/lamp-cap.svg', { width: 80, height: 60 });
     this.load.svg('bucket', 'art/bucket.svg', { width: 48, height: 52 });
   }
@@ -113,6 +139,7 @@ export class GameScene extends Phaser.Scene {
     const floor = this.add.tileSprite(0, FLOOR_Y, W, GAME_H - FLOOR_Y, 'floor').setOrigin(0, 0).setDepth(5);
     const ceiling = this.add.tileSprite(0, 0, W, 48, 'ceiling').setOrigin(0, 0).setDepth(2);
     this.layers = { wall, pipes, floor, ceiling };
+    this.applyTheme();
 
     this.gProps = this.add.graphics().setDepth(6);
     this.bucketSprite = this.add.image(0, 0, 'bucket').setOrigin(0.5, 0.04).setDepth(11);
@@ -168,6 +195,8 @@ export class GameScene extends Phaser.Scene {
       emitting: false,
     });
     this.confetti.setDepth(17);
+    this.papers = this.add.particles(0, 0, 'paper', { lifespan: 2400, speed: { min: 70, max: 240 }, angle: { min: -120, max: -10 }, gravityY: 55, rotate: { start: 0, end: 540 }, scale: { start: 1.2, end: 0.9 }, alpha: { start: 1, end: 0 }, emitting: false });
+    this.papers.setDepth(18);
 
     this.hud = new Hud(this, W);
     this.speech = new Speech(this);
@@ -257,6 +286,7 @@ export class GameScene extends Phaser.Scene {
   startLevel(def: LevelDef): void {
     this.levelDef = def;
     this.paused = false;
+    this.applyTheme();
     this.reset();
   }
 
@@ -399,7 +429,7 @@ export class GameScene extends Phaser.Scene {
         case 'lampHit':
         case 'lampTick': {
           const near = this.state.lamps.reduce((best, l) => (Math.abs(l.x - (e.x ?? 0)) < Math.abs(best.x - (e.x ?? 0)) ? l : best), this.state.lamps[0]!);
-          sfx.thud(near?.kind === 'meat');
+          sfx.thud(near?.kind !== 'lamp');
           if (e.type === 'lampHit') this.speech.say(this.nearestPlayer(e.x), 'Ouch!', 'hint');
           sfx.splash(e.value ?? 4);
           this.sparks.explode(e.type === 'lampHit' ? 18 : 8, sx, sy + 30);
@@ -433,6 +463,29 @@ export class GameScene extends Phaser.Scene {
           sfx.pop();
           this.confetti.explode(34, sx, sy);
           this.floatText(sx, sy - 24, `+${e.value}`, '#ffd36b');
+          break;
+        case 'spin': {
+          const w = this.state.softs.find((o) => o.kind === 'wheel' && Math.abs(o.x - (e.x ?? 0)) < 0.01);
+          if (w) this.softAnim.set(w.id, { spin: 16 + Math.random() * 6, angle: this.softAnim.get(w.id)?.angle ?? 0 });
+          sfx.tick();
+          this.floatText(sx, sy - 70, `+${e.value}`, '#ffd36b');
+          this.speech.say(null, 'Spin it!', 'cheer');
+          break;
+        }
+        case 'gust': {
+          const f = this.state.softs.find((o) => o.kind === 'fan' && Math.abs(o.x - (e.x ?? 0)) < 0.01);
+          if (f) this.softAnim.set(f.id, { spin: 40, angle: this.softAnim.get(f.id)?.angle ?? 0 });
+          sfx.whoosh();
+          this.papers.explode(26, sx + 30, sy - 10);
+          this.floatText(sx, sy - 60, `+${e.value}`, '#dff3f5');
+          this.speech.say(null, 'My notes!', 'urgent');
+          break;
+        }
+        case 'flip':
+          sfx.cheer();
+          this.floatText(sx, sy - 60, `+${e.value}`, '#ffd36b');
+          this.confetti.explode(16, sx, sy);
+          this.speech.say(null, 'Sunshine!', 'cheer');
           break;
         case 'sweep':
           sfx.fwip();
@@ -561,29 +614,70 @@ export class GameScene extends Phaser.Scene {
     const gs = this.gProps;
     const live = new Set<number>();
     const now = this.time.now / 1000;
+    const dt = this.lastDt;
     for (const o of this.state.softs) {
-      if (o.done) continue;
+      const setPiece = o.kind === 'wheel' || o.kind === 'fan' || o.kind === 'weather';
+      if (o.done && !setPiece) continue;
       const px = view.sx(o.x);
-      if (px < -80 || px > this.scale.width + 80) continue;
+      if (px < -120 || px > this.scale.width + 120) continue;
       live.add(o.id);
       let img = this.softSprites.get(o.id);
       if (!img) {
-        img = this.add.image(0, 0, o.kind).setDepth(o.kind === 'balloon' ? 13 : 12);
+        const key = o.kind === 'weather' ? 'weather-bad' : o.kind;
+        img = this.add.image(0, 0, key).setDepth(o.kind === 'balloon' ? 13 : setPiece ? 4 : 12);
         if (o.kind === 'balloon') {
           const palette = [0xff5a5f, 0xffd23f, 0x3bceac, 0x4ea8de, 0xb084f5, 0xff9f1c];
           img.setTint(palette[o.color % palette.length]!);
           img.setDisplaySize(o.r * 2 * PX * 1.15, o.r * 2 * PX * 1.5);
+        } else if (o.kind === 'fan') {
+          img.setOrigin(0.5, 0.35).setDisplaySize(o.r * 2 * PX * 1.3, o.r * 2 * PX * 1.56);
+        } else if (o.kind === 'weather') {
+          img.setOrigin(0.5, 0.37).setDisplaySize(o.r * 2 * PX * 1.3, o.r * 2 * PX * 1.3);
         } else {
           img.setDisplaySize(o.r * 2 * PX * 1.25, o.r * 2 * PX * 1.25);
         }
         this.softSprites.set(o.id, img);
       }
+      const py0 = view.sy(o.y);
+      if (setPiece) {
+        const anim = this.softAnim.get(o.id) ?? { spin: 0, angle: 0 };
+        this.softAnim.set(o.id, anim);
+        gs.lineStyle(6, 0x4a545d, 1);
+        gs.lineBetween(px, py0 + o.r * PX * (o.kind === 'wheel' ? 0.8 : 0.9), px, FLOOR_Y);
+        gs.fillStyle(0x4a545d, 1);
+        gs.fillRoundedRect(px - 24, FLOOR_Y - 6, 48, 8, 3);
+        if (o.kind === 'wheel') {
+          const prev = Math.floor(anim.angle / (Math.PI / 4));
+          anim.angle += anim.spin * dt;
+          anim.spin *= Math.pow(0.45, dt);
+          if (anim.spin < 0.2) anim.spin = 0;
+          if (Math.floor(anim.angle / (Math.PI / 4)) !== prev && anim.spin > 0.6) sfx.tick();
+          img.setRotation(anim.angle);
+          img.setPosition(px, py0);
+        } else if (o.kind === 'fan') {
+          anim.angle += (6 + anim.spin) * dt;
+          anim.spin *= Math.pow(0.4, dt);
+          img.setPosition(px, py0);
+          const cx = px;
+          const cy = py0;
+          const rr = o.r * PX * 0.9;
+          gs.fillStyle(0xaab6bf, 0.85);
+          for (let k = 0; k < 3; k++) {
+            const a = anim.angle + (k * Math.PI * 2) / 3;
+            gs.fillTriangle(cx, cy, cx + Math.cos(a - 0.35) * rr, cy + Math.sin(a - 0.35) * rr, cx + Math.cos(a + 0.35) * rr, cy + Math.sin(a + 0.35) * rr);
+          }
+        } else {
+          img.setTexture(o.done ? 'weather-good' : 'weather-bad');
+          img.setPosition(px, py0);
+        }
+        continue;
+      }
       const bob = Math.sin(now * 1.6 + o.id) * (o.kind === 'balloon' ? 4 : 1.5);
-      const py = view.sy(o.y) + bob;
+      const py = py0 + bob;
       const sway = Math.sin(now * 1.1 + o.id * 2) * (o.kind === 'balloon' ? 3 : 2);
       img.setPosition(px + sway, py);
       img.setRotation(sway * 0.01);
-      gs.lineStyle(o.kind === 'balloon' ? 2 : 2, o.kind === 'balloon' ? 0x8f99a3 : 0xe8edf1, o.kind === 'balloon' ? 0.9 : 0.8);
+      gs.lineStyle(2, o.kind === 'balloon' ? 0x8f99a3 : 0xe8edf1, o.kind === 'balloon' ? 0.9 : 0.8);
       if (o.kind === 'balloon') gs.lineBetween(px + sway, py + o.r * PX * 0.75, px + sway * 0.3, 48);
       else gs.lineBetween(px + sway, py - o.r * PX * 0.6, px, 48);
     }
@@ -591,6 +685,45 @@ export class GameScene extends Phaser.Scene {
       if (!live.has(id)) {
         img.destroy();
         this.softSprites.delete(id);
+        this.softAnim.delete(id);
+      }
+    }
+    this.syncDecor();
+  }
+
+  /** Studio set dressing: news desk, quiz set and talk-show couch in turn, with cameras and cameramen around them. */
+  private syncDecor(): void {
+    if (this.levelDef.theme !== 'studio') return;
+    const view = this.view;
+    const zoneLen = 70;
+    const first = Math.floor((view.camX - 6) / zoneLen);
+    const last = Math.floor((view.camX + this.scale.width / PX + 6) / zoneLen);
+    const live = new Set<string>();
+    const sets = ['news-desk', 'quiz-set', 'talk-set'];
+    const put = (key: string, tex: string, x: number, w: number, h: number, flip = false): void => {
+      const sx = view.sx(x);
+      if (sx < -200 || sx > this.scale.width + 200) return;
+      live.add(key);
+      let img = this.decor.get(key);
+      if (!img) {
+        img = this.add.image(0, 0, tex).setOrigin(0.5, 1).setDepth(3).setDisplaySize(w, h);
+        if (flip) img.setFlipX(true);
+        this.decor.set(key, img);
+      }
+      img.setPosition(sx, FLOOR_Y + 2);
+    };
+    for (let z = Math.max(0, first); z <= last; z++) {
+      const cx = z * zoneLen + 38;
+      put(`set${z}`, sets[z % 3]!, cx, 320, 220);
+      put(`cam${z}a`, 'camera', cx - 9, 80, 110);
+      put(`man${z}a`, 'cameraman', cx - 11.2, 80, 110);
+      put(`cam${z}b`, 'camera', cx + 10, 80, 110, true);
+      put(`man${z}b`, 'cameraman', cx + 12.2, 80, 110, true);
+    }
+    for (const [k, img] of this.decor) {
+      if (!live.has(k)) {
+        img.destroy();
+        this.decor.delete(k);
       }
     }
   }
@@ -648,6 +781,24 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private applyTheme(): void {
+    if (!this.layers) return;
+    const studio = this.levelDef.theme === 'studio';
+    this.layers.wall.setTexture(studio ? 'studio-wall' : 'wall');
+    this.layers.pipes.setTexture(studio ? 'studio-top' : 'pipes');
+    this.layers.floor.setTexture(studio ? 'studio-floor' : 'floor');
+    this.layers.ceiling.setTexture(studio ? 'studio-ceiling' : 'ceiling');
+    for (const img of this.lampSprites.values()) img.destroy();
+    this.lampSprites.clear();
+    for (const img of this.stepSprites.values()) img.destroy();
+    this.stepSprites.clear();
+    for (const img of this.softSprites.values()) img.destroy();
+    this.softSprites.clear();
+    this.softAnim.clear();
+    for (const img of this.decor.values()) img.destroy();
+    this.decor.clear();
+  }
+
   private updateCameraLayers(): void {
     if (!this.layers) return;
     const cam = this.view.camX * PX;
@@ -682,7 +833,7 @@ export class GameScene extends Phaser.Scene {
       const cy = view.sy(cap.y);
       const topX = cx - Math.sin(l.psi) * l.radius * PX;
       const topY = cy - Math.cos(l.psi) * l.radius * PX;
-      const meat = l.kind === 'meat';
+      const meat = l.kind !== 'lamp';
       g.lineStyle(meat ? 5 : 4, COLORS.cord);
       g.lineBetween(px, 48, px, py);
       g.lineBetween(px, py, topX, topY);
@@ -690,7 +841,7 @@ export class GameScene extends Phaser.Scene {
       g.fillCircle(px, py, 6);
       let img = this.lampSprites.get(l.id);
       if (!img) {
-        img = this.add.image(0, 0, meat ? 'meat' : 'lamp-cap').setOrigin(0.5, 0).setDepth(12);
+        img = this.add.image(0, 0, meat ? l.kind : this.levelDef.theme === 'studio' ? 'studio-cap' : 'lamp-cap').setOrigin(0.5, 0).setDepth(12);
         if (meat) img.setDisplaySize(l.radius * 2 * PX * 1.05, l.radius * 2 * PX * 1.2);
         this.lampSprites.set(l.id, img);
       }

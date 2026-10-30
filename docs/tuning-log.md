@@ -90,3 +90,7 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 - Icons regenerated via canvas (opaque, full-bleed), file names -v2 for cache busting.
 - Knives end 3.4 we before the first meat of a series (no knives under swinging pieces); optional second knife 1.7 further back.
 - Generator: 13 pattern kinds, weighted, no immediate repeat, quiet stretches and busy combos via gapScale.
+
+## Round: score/levels/studio
+- Combo x1.5/2/3 at 3/6/10 clean passes (props passed without bump, lamps, balloons, webs); +25 per clean prop pass; extra life every 2000 (max 5); checkpoints every 60 we on a clear spot, respawn with a fresh bucket; level-end bonuses (water x5, lives x500, time) and 1-3 stars.
+- Levels: tutorial + 5 factory levels (60-120 s) from fixed pattern lists; Endless Factory; TV Studio s1-s3 and Endless Studio (new props, boom mics, wheel/fan/weather set pieces).

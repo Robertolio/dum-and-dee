@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="220" viewBox="0 0 320 220">
+  <rect x="10" y="10" width="300" height="150" rx="8" fill="#5a1d8a" stroke="#2b0d45" stroke-width="5"/>
+  <g fill="#ffd23f" opacity="0.9"><path d="M50 40 l4 9 10 1 -8 7 3 10 -9 -6 -9 6 3 -10 -8 -7 10 -1z"/><path d="M250 60 l4 9 10 1 -8 7 3 10 -9 -6 -9 6 3 -10 -8 -7 10 -1z"/><path d="M160 30 l3 7 8 1 -6 5 2 8 -7 -5 -7 5 2 -8 -6 -5 8 -1z"/></g>
+  <rect x="100" y="44" width="120" height="30" rx="8" fill="#ff5a5f" stroke="#7a1b20" stroke-width="3"/>
+  <text x="160" y="66" text-anchor="middle" font-family="sans-serif" font-size="19" font-weight="bold" fill="#fff">QUIZ!</text>
+  <g><rect x="20" y="130" width="60" height="84" rx="6" fill="#3a3470" stroke="#17163e" stroke-width="4"/><rect x="30" y="140" width="40" height="14" rx="3" fill="#6bd6ff"/><circle cx="50" cy="176" r="10" fill="#ff5a5f"/>
+  <rect x="240" y="130" width="60" height="84" rx="6" fill="#3a3470" stroke="#17163e" stroke-width="4"/><rect x="250" y="140" width="40" height="14" rx="3" fill="#6bd6ff"/><circle cx="270" cy="176" r="10" fill="#3bceac"/></g>
+</svg>

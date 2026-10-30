@@ -1,4 +1,4 @@
-import type { BeamObstacle, SoftObstacle, GenState, LampKind, LampState, StepObstacle, StepKind } from './state';
+import type { BeamObstacle, SoftKind, SoftObstacle, GenState, LampKind, LampState, StepObstacle, StepKind } from './state';
 import type { Tuning } from './tuning';
 
 export interface LevelLamp {
@@ -26,7 +26,7 @@ export interface LevelData {
   lamps: LevelLamp[];
   steps: LevelStep[];
   beams?: { x0: number; x1: number; yBottom: number }[];
-  softs?: { kind: 'balloon' | 'web'; x: number; y: number; r?: number; color?: number }[];
+  softs?: { kind: SoftKind; x: number; y: number; r?: number; color?: number }[];
   /** Length of the hall in we (decorative). */
   length: number;
   /** Tutorial / story captions shown when the ladder approaches x. */
@@ -48,6 +48,10 @@ export const STEP_HEIGHT: Record<StepKind, number> = {
   tyre: 0.4,
   cheese: 0.3,
   knife: 0.26,
+  speaker: 0.45,
+  studioprop: 0.5,
+  clothes: 0.4,
+  film: 0.26,
   stair: 0.2,
 };
 
@@ -62,6 +66,10 @@ export const STEP_WIDTH: Record<StepKind, number> = {
   tyre: 1.0,
   cheese: 1.0,
   knife: 0.9,
+  speaker: 0.9,
+  studioprop: 1.1,
+  clothes: 1.0,
+  film: 0.8,
   stair: 0.7,
 };
 
@@ -76,6 +84,10 @@ export const STEP_MASS: Record<StepKind, number> = {
   tyre: 0.8,
   cheese: 0.7,
   knife: 0.6,
+  speaker: 2.5,
+  studioprop: 1.2,
+  clothes: 0.5,
+  film: 0.6,
   stair: 99,
 };
 
@@ -83,7 +95,10 @@ export function makeStep(id: number, x0: number, x1: number, hObj: number, kind:
   return { id, x0, x1, hObj, kind, mass: STEP_MASS[kind], vx: 0, slid: 0, used: false, passed: false, dirty: false };
 }
 
-const FLOOR_KINDS: StepKind[] = ['bracket', 'crate', 'pallet', 'banana', 'duck', 'pail', 'tyre', 'cheese'];
+const FACTORY_KINDS: StepKind[] = ['bracket', 'crate', 'pallet', 'banana', 'duck', 'pail', 'tyre', 'cheese'];
+const STUDIO_KINDS: StepKind[] = ['speaker', 'studioprop', 'clothes', 'film', 'banana', 'duck', 'pail', 'speaker'];
+const meatKind = (g: GenState): LampKind => (g.theme === 'studio' ? 'boom' : 'meat');
+const floorKinds = (g: GenState): StepKind[] => (g.theme === 'studio' ? STUDIO_KINDS : FACTORY_KINDS);
 
 /** Fixed test level (no generator). */
 export const PROTOTYPE_LEVEL: LevelData = {
@@ -110,7 +125,7 @@ export const ENDLESS_LEVEL: LevelData = {
 };
 
 export function makeLamp(id: number, x: number, kind: LampKind, t: Tuning, psi = 0, psiDot = 0): LampState {
-  const meat = kind === 'meat';
+  const meat = kind !== 'lamp';
   const len = meat ? t.meatL : t.lampL;
   const radius = meat ? t.meatR : t.lampR;
   return {
@@ -190,10 +205,11 @@ function addStep(s: { steps: StepObstacle[] }, g: GenState, x: number, kind: Ste
 /** Cleaver(s) well before a hanging piece of meat: the front hand jumps, lands, and still has room to duck. */
 export const KNIFE_TO_MEAT = 3.4;
 function addKnives(s: { steps: StepObstacle[] }, g: GenState, meatX: number, minX: number): void {
-  const w = STEP_WIDTH.knife;
+  const kind: StepKind = g.theme === 'studio' ? 'film' : 'knife';
+  const w = STEP_WIDTH[kind];
   const x0 = meatX - KNIFE_TO_MEAT - w;
-  addStep(s, g, x0, 'knife');
-  if (rand(g) < 0.22 && x0 - w - 1.7 >= minX) addStep(s, g, x0 - w - 1.7, 'knife');
+  addStep(s, g, x0, kind);
+  if (rand(g) < 0.22 && x0 - w - 1.7 >= minX) addStep(s, g, x0 - w - 1.7, kind);
 }
 
 function addLamp(s: { lamps: LampState[] }, g: GenState, t: Tuning, x: number, kind: LampKind, psi = 0, psiDot = 0): void {
@@ -213,11 +229,11 @@ function addMeatSeries(s: { lamps: LampState[]; steps: StepObstacle[] }, g: GenS
   const dphase = pick(g, [0, Math.PI, Math.PI / 2, 0.7, 1.6]);
   const phase0 = rand(g) * Math.PI * 2;
   const knives = rand(g) < 0.7;
-  const lead = knives ? KNIFE_TO_MEAT + STEP_WIDTH.knife + (rand(g) < 0.3 ? STEP_WIDTH.knife + 1.7 : 0) : 0;
+  const lead = knives ? KNIFE_TO_MEAT + STEP_WIDTH[g.theme === 'studio' ? 'film' : 'knife'] + (rand(g) < 0.3 ? STEP_WIDTH[g.theme === 'studio' ? 'film' : 'knife'] + 1.7 : 0) : 0;
   if (knives) addKnives(s, g, x + lead, x);
   for (let i = 0; i < n; i++) {
     const [psi, psiDot] = swingState(amp, phase0 + i * dphase, t.meatL, t);
-    addLamp(s, g, t, x + lead + i * spacing, 'meat', psi, psiDot);
+    addLamp(s, g, t, x + lead + i * spacing, meatKind(g), psi, psiDot);
   }
   return lead + (n - 1) * spacing + 1;
 }
@@ -278,7 +294,7 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
   void r2;
   g.gapScale = 1;
   // Weighted pick that never repeats the previous pattern, and avoids the one before it when possible.
-  const weights = [3, 3, 2.4, 2, 1.6, 1.8, 1.6, 1.3, 1.1, 1.3, 1.2, 1.1, 1.0];
+  const weights = g.theme === 'studio' ? [3, 3, 2.2, 1.4, 1.6, 1.8, 1.2, 0.2, 1.0, 1.3, 1.0, 1.1, 0.9, 1.5, 1.5, 1.4] : [3, 3, 2.4, 2, 1.6, 1.8, 1.6, 1.3, 1.1, 1.3, 1.2, 1.1, 1.0, 0, 0, 0];
   let total = 0;
   for (let i = 0; i < weights.length; i++) if (i !== g.last) total += weights[i]! * (i === g.last2 ? 0.4 : 1) * (i === 2 && d < 0.1 ? 0.3 : 1);
   let roll = rand(g) * total;
@@ -302,7 +318,7 @@ type EmitTarget = { steps: StepObstacle[]; lamps: LampState[]; beams: BeamObstac
 export function emitKind(s: EmitTarget, g: GenState, t: Tuning, kind: number, x: number, d: number): number {
   switch (kind) {
     case 0:
-      addStep(s, g, x, pick(g, FLOOR_KINDS.filter((k) => k !== 'banana')));
+      addStep(s, g, x, pick(g, floorKinds(g).filter((k) => k !== 'banana')));
       return 1.2;
     case 1:
       addLamp(s, g, t, x, 'lamp');
@@ -312,11 +328,11 @@ export function emitKind(s: EmitTarget, g: GenState, t: Tuning, kind: number, x:
     case 3:
       return addStairs(s, g, x, d);
     case 4: {
-      addStep(s, g, x, pick(g, FLOOR_KINDS));
+      addStep(s, g, x, pick(g, floorKinds(g)));
       const gap = lerp(7, 5.5, d) + rand(g);
       if (rand(g) < 0.5 + d * 0.3) {
         const [psi, psiDot] = swingState(lerp(t.meatAmpMin, t.meatAmpMax, rand(g)), rand(g) * 6.28, t.meatL, t);
-        addLamp(s, g, t, x + gap, 'meat', psi, psiDot);
+        addLamp(s, g, t, x + gap, meatKind(g), psi, psiDot);
         addKnives(s, g, x + gap, x + 1.6);
       } else addLamp(s, g, t, x + gap, 'lamp');
       return gap + 1.2;
@@ -326,8 +342,8 @@ export function emitKind(s: EmitTarget, g: GenState, t: Tuning, kind: number, x:
       const spacing = lerp(4.2, 3.2, d);
       let prev: StepKind | null = null;
       for (let i = 0; i < n; i++) {
-        let k = pick(g, FLOOR_KINDS);
-        if (k === prev) k = pick(g, FLOOR_KINDS);
+        let k = pick(g, floorKinds(g));
+        if (k === prev) k = pick(g, floorKinds(g));
         addStep(s, g, x + i * spacing, k);
         prev = k;
       }
@@ -362,10 +378,27 @@ export function emitKind(s: EmitTarget, g: GenState, t: Tuning, kind: number, x:
       g.gapScale = 0.85;
       return 4.2;
     }
+    case 13: {
+      // Quiz wheel on its stand.
+      s.softs.push({ id: g.nextSoftId++, kind: 'wheel', x: x + 1, y: 1.65, r: 0.72, color: 0, done: false });
+      if (rand(g) < 0.5) addStep(s, g, x - 2.6, pick(g, ['speaker', 'film', 'studioprop'] as const));
+      return 3.4;
+    }
+    case 14: {
+      // News desk fan: gust blows the presenter's papers away.
+      s.softs.push({ id: g.nextSoftId++, kind: 'fan', x: x + 1, y: 1.55, r: 0.5, color: 0, done: false });
+      return 2.4;
+    }
+    case 15: {
+      // Weather map with bad weather: flip it to sunshine.
+      s.softs.push({ id: g.nextSoftId++, kind: 'weather', x: x + 1, y: 1.85, r: 0.6, color: 0, done: false });
+      if (rand(g) < 0.5) addLamp(s, g, t, x + 4.6, 'lamp');
+      return 5.4;
+    }
     default: {
       // Meat first, then a prop a good stretch later.
       const m = addMeatSeries(s, g, t, x, d * 0.7);
-      addStep(s, g, x + m + 3.4, pick(g, FLOOR_KINDS));
+      addStep(s, g, x + m + 3.4, pick(g, floorKinds(g)));
       g.gapScale = 0.9;
       return m + 4.6;
     }

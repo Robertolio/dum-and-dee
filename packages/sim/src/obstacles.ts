@@ -113,9 +113,16 @@ export function integrateSofts(s: GameState, t: Tuning): void {
     const hit = closestOnSegment(seg.ax, seg.ay, seg.bx, seg.by, o.x, o.y);
     if (hit.dist >= o.r + t.ladderThickness / 2) continue;
     o.done = true;
-    const pts = o.kind === 'balloon' ? t.scoreBalloon : t.scoreWeb;
+    const table = {
+      balloon: [t.scoreBalloon, 'pop'],
+      web: [t.scoreWeb, 'sweep'],
+      wheel: [t.scoreWheel, 'spin'],
+      fan: [t.scoreFan, 'gust'],
+      weather: [t.scoreWeather, 'flip'],
+    } as const;
+    const [pts, type] = table[o.kind];
     s.score += pts;
-    s.events.push({ tick: s.tick, type: o.kind === 'balloon' ? 'pop' : 'sweep', value: pts, x: o.x, y: o.y });
+    s.events.push({ tick: s.tick, type, value: pts, x: o.x, y: o.y });
   }
 }
 

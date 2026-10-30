@@ -76,7 +76,8 @@ export interface BucketState {
   splash: number;
 }
 
-export type LampKind = 'lamp' | 'meat';
+export type LampKind = 'lamp' | 'meat' | 'boom';
+export type SoftKind = 'balloon' | 'web' | 'wheel' | 'fan' | 'weather';
 
 export interface LampState {
   id: number;
@@ -96,7 +97,7 @@ export interface LampState {
   broken: boolean;
 }
 
-export type StepKind = 'bracket' | 'crate' | 'pallet' | 'banana' | 'duck' | 'pail' | 'tyre' | 'cheese' | 'knife' | 'stair';
+export type StepKind = 'bracket' | 'crate' | 'pallet' | 'banana' | 'duck' | 'pail' | 'tyre' | 'cheese' | 'knife' | 'speaker' | 'studioprop' | 'clothes' | 'film' | 'stair';
 
 export interface StepObstacle {
   id: number;
@@ -116,7 +117,7 @@ export interface StepObstacle {
 /** Things the ladder simply passes through: balloons are popped, cobwebs are swept away. */
 export interface SoftObstacle {
   id: number;
-  kind: 'balloon' | 'web';
+  kind: SoftKind;
   x: number;
   y: number;
   r: number;
@@ -147,6 +148,9 @@ export type GameEventType =
   | 'sweep'
   | 'slip'
   | 'bump'
+  | 'spin'
+  | 'gust'
+  | 'flip'
   | 'comboUp'
   | 'comboLost'
   | 'checkpoint'
@@ -218,6 +222,7 @@ export interface GameState {
   lives: number;
   distance: number;
   gameOver: boolean;
+  theme: 'factory' | 'studio';
   combo: number;
   comboMult: number;
   bestCombo: number;

@@ -32,13 +32,13 @@ describe('balloons and cobwebs', () => {
 
   it('the endless generator makes both, in moderation', () => {
     const s = createState(ENDLESS_LEVEL, T);
-    const seen = { balloon: new Set<number>(), web: new Set<number>() };
+    const seen = { balloon: new Set<number>(), web: new Set<number>() } as Record<string, Set<number>> & { balloon: Set<number>; web: Set<number> };
     let patterns = 0;
     for (let x = 0; x <= 1500; x += 20) {
       s.players[0].x = x;
       s.players[1].x = x + T.L0;
       runFor(s, upright(0), upright(0), 1 / 60);
-      for (const o of s.softs) seen[o.kind].add(o.id);
+      for (const o of s.softs) seen[o.kind]?.add(o.id);
       patterns = s.gen!.patterns;
     }
     expect(seen.balloon.size).toBeGreaterThan(3);

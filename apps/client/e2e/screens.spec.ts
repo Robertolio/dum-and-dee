@@ -1,6 +1,21 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Menu, level select, game over and level complete', () => {
+  test('TV Studio levels are selectable and run without errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/');
+    await page.waitForFunction(() => (window as any).__dd !== undefined);
+    await page.getByTestId('start-button').click();
+    await expect(page.getByTestId('level-s1')).toBeVisible();
+    await expect(page.getByTestId('level-endless-studio')).toBeVisible();
+    await page.getByTestId('level-s1').click();
+    await page.evaluate(() => (window as any).__dd.setInputOverride([{ push: 0.7, hTarget: 0.8 }, { push: 0.7, hTarget: 0.8 }]));
+    await page.waitForTimeout(3000);
+    expect(await page.evaluate(() => (window as any).__dd.getState().theme)).toBe('studio');
+    expect(errors).toEqual([]);
+  });
+
   test('Start opens the level select; choosing a level starts it; stars are remembered', async ({ page }) => {
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__dd !== undefined);
