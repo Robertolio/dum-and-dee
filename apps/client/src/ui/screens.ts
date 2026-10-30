@@ -23,6 +23,8 @@ export class Screens {
   /** Online play takes over the menu button (leave dialog instead of the local menu). */
   menuHook: (() => boolean) | null = null;
   onTogether: (() => void) | null = null;
+  onFriends: (() => void) | null = null;
+  friendsCount: () => number = () => 0;
 
   constructor(private readonly scene: GameScene) {
     this.menu.id = 'menu';
@@ -125,7 +127,22 @@ export class Screens {
       this.menu.classList.add('hidden');
       this.onTogether?.();
     });
-    card.append(play, inf, together);
+    const friends = el('button', 'big', '🤝 Friends');
+    friends.dataset.testid = 'btn-friends';
+    friends.append(el('small', '', 'Codes, teams, play with a friend'));
+    const badge = el('span', 'badge hidden');
+    badge.dataset.testid = 'friends-badge';
+    const fc = this.friendsCount();
+    badge.textContent = String(fc);
+    badge.classList.toggle('hidden', fc === 0);
+    friends.append(badge);
+    friends.addEventListener('click', () => {
+      sfx.unlock();
+      sfx.click();
+      this.menu.classList.add('hidden');
+      this.onFriends?.();
+    });
+    card.append(play, inf, together, friends);
     if (running) {
       const resume = el('button', 'plain', 'Resume');
       resume.dataset.testid = 'menu-resume';

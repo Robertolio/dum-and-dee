@@ -1,8 +1,10 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { skipIdentity } from './helpers';
 
 test.use({ baseURL: process.env.E2E_BASE ?? 'http://localhost:4600' });
 
 async function open(ctx: BrowserContext, url: string): Promise<Page> {
+  await skipIdentity(ctx);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('PAGEERROR', String(e)));
   await page.goto(url);

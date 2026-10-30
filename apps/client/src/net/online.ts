@@ -1,3 +1,4 @@
+import { loadIdentity } from '../social/identity';
 import {
   ClientSync,
   type CtlMode,
@@ -26,7 +27,8 @@ export type OnlineEvent =
   | { type: 'pause'; until: number }
   | { type: 'resume' }
   | { type: 'closed'; reason: string }
-  | { type: 'error'; code: string };
+  | { type: 'error'; code: string }
+  | { type: 'invite_sent'; delivered: 'live' | 'push' | 'none' };
 
 const SESSION_KEY = 'dd-online';
 const GIVE_UP_MS = 70_000;
@@ -169,6 +171,8 @@ export class OnlineClient {
     ws.onopen = () => {
       this.retry = 0;
       this.setStatus('open');
+      const id = loadIdentity();
+      if (id) this.sendMsg({ t: 'auth', token: id.token });
       if (this.pendingCreate) {
         this.pendingCreate = false;
         this.sendMsg({ t: 'create', v: 1 });
@@ -180,7 +184,9 @@ export class OnlineClient {
     ws.onmessage = (ev) => {
       if (typeof ev.data !== 'string') return;
       try {
-        this.onMessage(JSON.parse(ev.data) as ServerMsg);
+        const msg = JSON.parse(ev.data) as ServerMsg | { t: 'invite_sent'; delivered: 'live' | 'push' | 'none' };
+        if (msg.t === 'invite_sent') this.emit({ type: 'invite_sent', delivered: msg.delivered });
+        else this.onMessage(msg as ServerMsg);
       } catch {
         /* ignore malformed */
       }
@@ -257,6 +263,11 @@ export class OnlineClient {
 
   sendMsg(m: object): void {
     if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(m));
+  }
+
+  /** Tell a friend which room is waiting for them (the room must be ours). */
+  invite(friendId: string): void {
+    this.sendMsg({ t: 'invite', id: friendId, room: this.code });
   }
 
   setSeat(seat: Seat): void {

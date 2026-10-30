@@ -9,6 +9,10 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
+    storageState: {
+      cookies: [],
+      origins: [PORT, 4600].map((p) => ({ origin: `http://localhost:${p}`, localStorage: [{ name: 'dd-skip', value: '1' }] })),
+    },
     baseURL: `http://localhost:${PORT}/`,
     // Phone in landscape (iPhone 14-ish), touch enabled.
     viewport: { width: 844, height: 390 },
@@ -31,7 +35,7 @@ export default defineConfig({
     {
       // Production server (static files + /ws) for the online tests; needs `pnpm build` first.
       command: 'node ../../scripts/serve.mjs',
-      env: { PORT: '4600', DD_SINGLE_PORT: '1' },
+      env: { PORT: '4600', DD_SINGLE_PORT: '1', SQLITE_FILE: ':memory:' },
       url: 'http://localhost:4600/robots.txt',
       reuseExistingServer: true,
       timeout: 60_000,

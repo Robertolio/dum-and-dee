@@ -3,6 +3,7 @@ import { CAMPAIGN, levelById, type LevelDef } from '@dd/sim';
 import { normalizeCode, type EndMsg, type Seat } from '@dd/net';
 import type { GameScene } from '../scenes/GameScene';
 import type { Screens } from './screens';
+import type { FriendView } from '../net/social';
 import { OnlineClient, type OnlineEvent, type RoomView } from '../net/online';
 import { sfx } from '../audio/sfx';
 import { keepScreenOn } from '../platform/wakelock';
@@ -50,6 +51,8 @@ export class OnlineUI {
   private lastLevelSent = '';
   private levelMode: 'play' | 'endless' = 'play';
   private resultBox: HTMLElement | null = null;
+  private inviteAfterCreate: FriendView | null = null;
+  private inviteNote: { name: string; delivered: 'live' | 'push' | 'none' | 'pending' } | null = null;
 
   constructor(private readonly scene: GameScene, private readonly screens: Screens) {
     this.root.id = 'online';
@@ -83,6 +86,7 @@ export class OnlineUI {
     nw.addEventListener('click', () => {
       sfx.unlock();
       sfx.click();
+      this.inviteNote = null;
       this.client.create();
       this.showWait('Creating game…');
     });
@@ -121,6 +125,15 @@ export class OnlineUI {
     this.root.classList.remove('hidden');
   }
 
+  /** 'Play with <name>': open a room and tell the friend (live, push, or a WhatsApp nudge as last resort). */
+  playWith(friend: FriendView): void {
+    this.scene.paused = true;
+    this.inviteAfterCreate = friend;
+    this.inviteNote = { name: friend.name, delivered: 'pending' };
+    this.client.create();
+    this.showWait('Creating game…');
+  }
+
   joinFromLink(code: string): void {
     const c = normalizeCode(code);
     this.scene.paused = true;
@@ -153,8 +166,16 @@ export class OnlineUI {
 
   private onEvent(e: OnlineEvent): void {
     switch (e.type) {
+      case 'invite_sent':
+        if (this.inviteNote) this.inviteNote.delivered = e.delivered;
+        if (this.room?.phase === 'lobby') this.renderLobby();
+        break;
       case 'room':
         this.room = e.room;
+        if (this.inviteAfterCreate && e.room.phase === 'lobby') {
+          this.client.invite(this.inviteAfterCreate.id);
+          this.inviteAfterCreate = null;
+        }
         if (e.room.phase === 'lobby') {
           if (this.inGame) this.leaveGameView();
           this.renderLobby();
@@ -220,6 +241,7 @@ export class OnlineUI {
   }
 
   private leaveToMenu(): void {
+    this.inviteNote = null;
     this.client.leave();
     this.leaveGameView();
     this.root.classList.add('hidden');
@@ -280,6 +302,7 @@ export class OnlineUI {
     });
     const status = tid(el('p', 'sub', this.statusText(r, !!both)), 'lobby-status');
     left.append(ready, status);
+    if (this.inviteNote) left.append(this.inviteNoteEl(link, r.code));
     const qr = tid(el('canvas', 'qr'), 'lobby-qr');
     this.drawQr(qr, link);
     top.append(left, qr);
@@ -336,6 +359,23 @@ export class OnlineUI {
     this.root.replaceChildren(card);
     this.root.classList.remove('hidden');
     if (r.phase === 'countdown') this.startCountdown();
+  }
+
+  private inviteNoteEl(link: string, code: string): HTMLElement {
+    const n = this.inviteNote!;
+    const box = tid(el('div', 'invite-note'), 'lobby-invite-note');
+    if (n.delivered === 'pending') {
+      box.append(el('small', '', `Telling ${n.name}…`));
+    } else if (n.delivered === 'none') {
+      box.append(el('small', '', `${n.name} is offline and has no notifications on. Send a nudge:`));
+      const wa = tid(el('a', 'btn wa', `WhatsApp ${n.name}`), 'lobby-nudge');
+      wa.href = `https://wa.me/?text=${encodeURIComponent(`I am waiting in Dum & Dee! Join me: ${link}`)}`;
+      wa.target = '_blank';
+      wa.rel = 'noopener';
+      box.append(wa);
+    } else box.append(el('small', '', n.delivered === 'live' ? `${n.name} is online and sees your invite.` : `${n.name} got a notification.`));
+    void code;
+    return box;
   }
 
   private statusText(r: RoomView, both: boolean): string {
