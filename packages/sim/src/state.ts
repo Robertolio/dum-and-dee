@@ -168,6 +168,11 @@ export interface GenState {
   nextBeamId: number;
   nextSoftId: number;
   patterns: number;
+  /** Index of the previous pattern kind (no immediate repeats) and the one before it. */
+  last: number;
+  last2: number;
+  /** Extra/less spacing after the pattern just emitted (quiet stretches, busy combos). */
+  gapScale: number;
 }
 
 export interface GameState {

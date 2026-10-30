@@ -85,3 +85,8 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 
 ## Round: cleaver tuning + app icon
 - Knife 0.26 high, 0.9 wide, placed 1.3 we before meat (landing room), 22% double knife 1.5 we apart. Icon + manifest added.
+
+## Round: icon v2, knives, variety
+- Icons regenerated via canvas (opaque, full-bleed), file names -v2 for cache busting.
+- Knives end 3.4 we before the first meat of a series (no knives under swinging pieces); optional second knife 1.7 further back.
+- Generator: 13 pattern kinds, weighted, no immediate repeat, quiet stretches and busy combos via gapScale.

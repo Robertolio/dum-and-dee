@@ -153,6 +153,9 @@ export function createGen(level: LevelData, existingLamps: number, existingSteps
     nextBeamId: existingBeams,
     nextSoftId: existingSofts,
     patterns: 0,
+    last: -1,
+    last2: -1,
+    gapScale: 1,
   };
 }
 
@@ -177,12 +180,13 @@ function addStep(s: { steps: StepObstacle[] }, g: GenState, x: number, kind: Ste
   s.steps.push(makeStep(g.nextStepId++, x, x + (width ?? STEP_WIDTH[kind]), height ?? STEP_HEIGHT[kind], kind));
 }
 
-/** Cleaver(s) well before a hanging piece of meat, so the jump lands before the meat swings in. */
-function addKnives(s: { steps: StepObstacle[] }, g: GenState, meatX: number): void {
+/** Cleaver(s) well before a hanging piece of meat: the front hand jumps, lands, and still has room to duck. */
+export const KNIFE_TO_MEAT = 3.4;
+function addKnives(s: { steps: StepObstacle[] }, g: GenState, meatX: number, minX: number): void {
   const w = STEP_WIDTH.knife;
-  const x0 = meatX - 1.0 - w - 0.3;
+  const x0 = meatX - KNIFE_TO_MEAT - w;
   addStep(s, g, x0, 'knife');
-  if (rand(g) < 0.22) addStep(s, g, x0 - w - 1.5, 'knife');
+  if (rand(g) < 0.22 && x0 - w - 1.7 >= minX) addStep(s, g, x0 - w - 1.7, 'knife');
 }
 
 function addLamp(s: { lamps: LampState[] }, g: GenState, t: Tuning, x: number, kind: LampKind, psi = 0, psiDot = 0): void {
@@ -201,12 +205,14 @@ function addMeatSeries(s: { lamps: LampState[]; steps: StepObstacle[] }, g: GenS
   const amp = lerp(t.meatAmpMin, t.meatAmpMax, rand(g) * 0.5 + d * 0.5);
   const dphase = pick(g, [0, Math.PI, Math.PI / 2, 0.7, 1.6]);
   const phase0 = rand(g) * Math.PI * 2;
+  const knives = rand(g) < 0.7;
+  const lead = knives ? KNIFE_TO_MEAT + STEP_WIDTH.knife + (rand(g) < 0.3 ? STEP_WIDTH.knife + 1.7 : 0) : 0;
+  if (knives) addKnives(s, g, x + lead, x);
   for (let i = 0; i < n; i++) {
     const [psi, psiDot] = swingState(amp, phase0 + i * dphase, t.meatL, t);
-    addLamp(s, g, t, x + i * spacing, 'meat', psi, psiDot);
-    if (rand(g) < 0.55) addKnives(s, g, x + i * spacing);
+    addLamp(s, g, t, x + lead + i * spacing, 'meat', psi, psiDot);
   }
-  return (n - 1) * spacing + 1;
+  return lead + (n - 1) * spacing + 1;
 }
 
 function addStairs(s: { steps: StepObstacle[]; beams: BeamObstacle[] }, g: GenState, x: number, d: number): number {
@@ -261,44 +267,95 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
     else addStep(s, g, x, pick(g, ['crate', 'banana', 'duck', 'pail'] as const));
     return 1;
   }
-  if (r2 < 0.12) return addBalloons(s, g, x, d);
-  if (r2 < 0.2) return addWebs(s, g, x);
-  if (r < 0.26) {
-    addStep(s, g, x, pick(g, FLOOR_KINDS));
-    return 1.2;
+  void r;
+  void r2;
+  g.gapScale = 1;
+  // Weighted pick that never repeats the previous pattern, and avoids the one before it when possible.
+  const weights = [3, 3, 2.4, 2, 1.6, 1.8, 1.6, 1.3, 1.1, 1.3, 1.2, 1.1, 1.0];
+  let total = 0;
+  for (let i = 0; i < weights.length; i++) if (i !== g.last) total += weights[i]! * (i === g.last2 ? 0.4 : 1) * (i === 2 && d < 0.1 ? 0.3 : 1);
+  let roll = rand(g) * total;
+  let kind = 0;
+  for (let i = 0; i < weights.length; i++) {
+    if (i === g.last) continue;
+    roll -= weights[i]! * (i === g.last2 ? 0.4 : 1) * (i === 2 && d < 0.1 ? 0.3 : 1);
+    if (roll <= 0) {
+      kind = i;
+      break;
+    }
   }
-  if (r < 0.42) {
-    addLamp(s, g, t, x, 'lamp');
-    return 1;
+  g.last2 = g.last;
+  g.last = kind;
+  switch (kind) {
+    case 0:
+      addStep(s, g, x, pick(g, FLOOR_KINDS.filter((k) => k !== 'banana')));
+      return 1.2;
+    case 1:
+      addLamp(s, g, t, x, 'lamp');
+      return 1;
+    case 2:
+      return addMeatSeries(s, g, t, x, d);
+    case 3:
+      return addStairs(s, g, x, d);
+    case 4: {
+      addStep(s, g, x, pick(g, FLOOR_KINDS));
+      const gap = lerp(7, 5.5, d) + rand(g);
+      if (rand(g) < 0.5 + d * 0.3) {
+        const [psi, psiDot] = swingState(lerp(t.meatAmpMin, t.meatAmpMax, rand(g)), rand(g) * 6.28, t.meatL, t);
+        addLamp(s, g, t, x + gap, 'meat', psi, psiDot);
+        addKnives(s, g, x + gap, x + 1.6);
+      } else addLamp(s, g, t, x + gap, 'lamp');
+      return gap + 1.2;
+    }
+    case 5: {
+      const n = 2 + (rand(g) < d ? 1 : 0);
+      const spacing = lerp(4.2, 3.2, d);
+      let prev: StepKind | null = null;
+      for (let i = 0; i < n; i++) {
+        let k = pick(g, FLOOR_KINDS);
+        if (k === prev) k = pick(g, FLOOR_KINDS);
+        addStep(s, g, x + i * spacing, k);
+        prev = k;
+      }
+      return (n - 1) * spacing + 1.2;
+    }
+    case 6:
+      return addBalloons(s, g, x, d);
+    case 7:
+      return addWebs(s, g, x);
+    case 8: {
+      // Banana trail: slippery, with room to jump or sidestep in between.
+      const n = 2 + (rand(g) < 0.4 ? 1 : 0);
+      for (let i = 0; i < n; i++) addStep(s, g, x + i * 3.4, 'banana');
+      return (n - 1) * 3.4 + 1;
+    }
+    case 9: {
+      // Two lamps with a gap: a short rhythm.
+      addLamp(s, g, t, x, 'lamp');
+      addLamp(s, g, t, x + 3.1 + rand(g) * 0.8, 'lamp');
+      return 4.5;
+    }
+    case 10: {
+      // Quiet stretch: just a few balloons high up, then breathing room.
+      g.gapScale = 1.6;
+      return addBalloons(s, g, x, 0) * 0.5;
+    }
+    case 11: {
+      // Busy combo: a prop with a web or balloons right behind it.
+      addStep(s, g, x, pick(g, ['duck', 'pail', 'tyre', 'cheese', 'crate'] as const));
+      if (rand(g) < 0.5) s.softs.push({ id: g.nextSoftId++, kind: 'web', x: x + 3.4, y: 1.6, r: 0.55, color: 0, done: false });
+      else s.softs.push({ id: g.nextSoftId++, kind: 'balloon', x: x + 3.0, y: 1.9 + rand(g) * 0.6, r: 0.4, color: Math.floor(rand(g) * 6), done: false });
+      g.gapScale = 0.85;
+      return 4.2;
+    }
+    default: {
+      // Meat first, then a prop a good stretch later.
+      const m = addMeatSeries(s, g, t, x, d * 0.7);
+      addStep(s, g, x + m + 3.4, pick(g, FLOOR_KINDS));
+      g.gapScale = 0.9;
+      return m + 4.6;
+    }
   }
-  if (r < 0.6) {
-    return addMeatSeries(s, g, t, x, d);
-  }
-  if (r < 0.72) {
-    return addStairs(s, g, x, d);
-  }
-  if (r < 0.84) {
-    // Floor object right before a lamp or meat: step up and bend deeper.
-    addStep(s, g, x, pick(g, FLOOR_KINDS));
-    const gap = lerp(7, 5.5, d) + rand(g);
-    if (rand(g) < 0.5 + d * 0.3) {
-      const [psi, psiDot] = swingState(lerp(t.meatAmpMin, t.meatAmpMax, rand(g)), rand(g) * 6.28, t.meatL, t);
-      addLamp(s, g, t, x + gap, 'meat', psi, psiDot);
-      addKnives(s, g, x + gap);
-    } else addLamp(s, g, t, x + gap, 'lamp');
-    return gap + 1.2;
-  }
-  // Cluster of 2–3 floor objects with room to settle in between.
-  const n = 2 + (rand(g) < d ? 1 : 0);
-  const spacing = lerp(4.2, 3.2, d);
-  let prev: StepKind | null = null;
-  for (let i = 0; i < n; i++) {
-    let k = pick(g, FLOOR_KINDS);
-    if (k === prev) k = pick(g, FLOOR_KINDS);
-    addStep(s, g, x + i * spacing, k);
-    prev = k;
-  }
-  return (n - 1) * spacing + 1.2;
 }
 
 /** Keep generating until `horizon` we ahead of the ladder; drop obstacles far behind it. */
@@ -308,7 +365,7 @@ export function extendLevel(s: { gen: GenState | null; steps: StepObstacle[]; la
   while (g.nextX < ladderX + horizon) {
     const len = emitPattern(s, g, t);
     const d = difficultyAt(g.nextX);
-    g.nextX += len + lerp(10, 6.5, d) + rand(g) * 3;
+    g.nextX += len + (lerp(10, 6.5, d) + rand(g) * 3) * g.gapScale;
   }
   const keep = ladderX - 14;
   if (s.steps.length > 0 && s.steps[0]!.x1 < keep) s.steps = s.steps.filter((o) => o.x1 >= keep);
