@@ -109,6 +109,8 @@ export interface StepObstacle {
   vx: number;
   slid: number;
   used: boolean;
+  passed: boolean;
+  dirty: boolean;
 }
 
 /** Things the ladder simply passes through: balloons are popped, cobwebs are swept away. */
@@ -145,6 +147,13 @@ export type GameEventType =
   | 'sweep'
   | 'slip'
   | 'bump'
+  | 'comboUp'
+  | 'comboLost'
+  | 'checkpoint'
+  | 'respawn'
+  | 'extraLife'
+  | 'levelDone'
+  | 'passStep'
   | 'bucketBonk'
   | 'push'
   | 'beamHit'
@@ -175,6 +184,17 @@ export interface GenState {
   gapScale: number;
 }
 
+export interface LevelResult {
+  score: number;
+  stars: number;
+  water: number;
+  waterBonus: number;
+  lifeBonus: number;
+  timeBonus: number;
+  bestCombo: number;
+  time: number;
+}
+
 export interface GameState {
   tick: number;
   time: number;
@@ -197,6 +217,17 @@ export interface GameState {
   lives: number;
   distance: number;
   gameOver: boolean;
+  combo: number;
+  comboMult: number;
+  bestCombo: number;
+  checkpointX: number;
+  nextLifeScore: number;
+  livesLost: number;
+  /** Scripted levels end at levelLength; par is the time (s) for the full time bonus. */
+  levelLength: number;
+  par: number;
+  finished: boolean;
+  result: LevelResult | null;
   /** Events raised during the most recent step() call. */
   events: GameEvent[];
 }

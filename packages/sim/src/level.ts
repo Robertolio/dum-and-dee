@@ -28,6 +28,9 @@ export interface LevelData {
   softs?: { kind: 'balloon' | 'web'; x: number; y: number; r?: number; color?: number }[];
   /** Length of the hall in we (decorative). */
   length: number;
+  /** Par time (s) for the level-end time bonus. */
+  par?: number;
+  theme?: 'factory' | 'studio';
   /** Endless procedural generation ahead of the ladder. */
   generator?: LevelGenerator;
 }
@@ -74,7 +77,7 @@ export const STEP_MASS: Record<StepKind, number> = {
 };
 
 export function makeStep(id: number, x0: number, x1: number, hObj: number, kind: StepKind): StepObstacle {
-  return { id, x0, x1, hObj, kind, mass: STEP_MASS[kind], vx: 0, slid: 0, used: false };
+  return { id, x0, x1, hObj, kind, mass: STEP_MASS[kind], vx: 0, slid: 0, used: false, passed: false, dirty: false };
 }
 
 const FLOOR_KINDS: StepKind[] = ['bracket', 'crate', 'pallet', 'banana', 'duck', 'pail', 'tyre', 'cheese'];

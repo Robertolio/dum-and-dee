@@ -9,6 +9,7 @@ import { evaluateStepCatch, integrateStepUps, updateStepTargets } from './stepup
 import { integrateBucket, primeBucket } from './bucket';
 import { integrateLamps } from './lamp';
 import { integrateBucketHits, integrateBeams, integrateSofts, integrateJump, resolveObstacles } from './obstacles';
+import { respawn, updateProgress } from './progress';
 import { buildBeams, buildSofts, buildLamps, buildSteps, createGen, ENDLESS_LEVEL, extendLevel, type LevelData } from './level';
 
 export function createPlayer(x: number, t: Tuning): PlayerState {
@@ -93,6 +94,16 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
     lives: t.startLives,
     distance: 0,
     gameOver: false,
+    combo: 0,
+    comboMult: 1,
+    bestCombo: 0,
+    checkpointX: startX + t.L0 / 2,
+    nextLifeScore: t.extraLifeEvery,
+    livesLost: 0,
+    levelLength: level.generator ? Infinity : level.length,
+    par: level.par ?? 90,
+    finished: false,
+    result: null,
     events: [],
   };
   s.gen = createGen(level, s.lamps.length, s.steps.length, s.beams.length, s.softs.length);
@@ -138,11 +149,12 @@ function updateBalance(s: GameState, t: Tuning): void {
 
 function loseLife(s: GameState, type: 'ladderSlipped' | 'bucketEmpty', _t: Tuning): void {
   s.lives = Math.max(0, s.lives - 1);
+  s.livesLost += 1;
   s.events.push({ tick: s.tick, type, value: s.lives, x: s.bucket.xP, y: s.bucket.yP });
   if (s.lives === 0) {
     s.gameOver = true;
     s.events.push({ tick: s.tick, type: 'gameOver' });
-  }
+  } else respawn(s, _t);
 }
 
 function updateWaterAndLives(s: GameState, t: Tuning): void {
@@ -170,7 +182,7 @@ function updateScore(s: GameState, t: Tuning): void {
  */
 export function step(s: GameState, inputs: readonly [PlayerInput, PlayerInput], t: Tuning = DEFAULT_TUNING): GameState {
   s.events = [];
-  if (s.gameOver) return s;
+  if (s.gameOver || s.finished) return s;
 
   for (let i = 0; i < 2; i++) {
     const inp = clampInput(inputs[i]!);
@@ -198,6 +210,7 @@ export function step(s: GameState, inputs: readonly [PlayerInput, PlayerInput], 
   updateBalance(s, t);
   updateWaterAndLives(s, t);
   updateScore(s, t);
+  updateProgress(s, t);
 
   s.tick += 1;
   s.time = s.tick * t.dt;

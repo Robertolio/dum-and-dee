@@ -43,6 +43,8 @@ describe('cleavers before hanging meat', () => {
     for (let x = 0; x <= 600; x += 8) {
       all.players[0].x = x;
       all.players[1].x = x + T.L0;
+      all.bucket.water = 100;
+      all.lives = 3;
       runFor(all, upright(0), upright(0), 1 / 60);
       for (const o of all.steps) if (o.kind === 'knife' && !knives.includes(o.x0)) knives.push(o.x0);
       for (const l of all.lamps) if (l.kind === 'meat' && !meats.includes(l.x)) meats.push(l.x);

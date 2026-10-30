@@ -158,6 +158,13 @@ export interface Tuning {
   scoreBalloon: number;
   scoreWeb: number;
   startLives: number;
+  maxLives: number;
+  extraLifeEvery: number;
+  scorePassStep: number;
+  checkpointSpacing: number;
+  scoreWaterBonus: number;
+  scoreLifeBonus: number;
+  scoreTimeBonus: number;
 }
 
 export const DEFAULT_TUNING: Tuning = {
@@ -263,6 +270,13 @@ export const DEFAULT_TUNING: Tuning = {
   scoreBalloon: 30,
   scoreWeb: 15,
   startLives: 3,
+  maxLives: 5,
+  extraLifeEvery: 2000,
+  scorePassStep: 25,
+  checkpointSpacing: 60,
+  scoreWaterBonus: 5,
+  scoreLifeBonus: 500,
+  scoreTimeBonus: 10,
 };
 
 export function cloneTuning(t: Tuning = DEFAULT_TUNING): Tuning {
