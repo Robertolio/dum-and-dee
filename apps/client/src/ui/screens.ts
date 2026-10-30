@@ -20,6 +20,9 @@ export class Screens {
   private readonly menu = el('div');
   private readonly result = el('div');
   private readonly menuBtn = el('button', '', '☰');
+  /** Online play takes over the menu button (leave dialog instead of the local menu). */
+  menuHook: (() => boolean) | null = null;
+  onTogether: (() => void) | null = null;
 
   constructor(private readonly scene: GameScene) {
     this.menu.id = 'menu';
@@ -34,6 +37,7 @@ export class Screens {
     this.menuBtn.addEventListener('click', () => {
       sfx.unlock();
       sfx.click();
+      if (this.menuHook?.()) return;
       this.showMenu();
     });
     document.body.append(this.menu, this.result, this.menuBtn);
@@ -53,7 +57,7 @@ export class Screens {
     this.scene.startLevel(def);
   }
 
-  private continueDef(): LevelDef {
+  continueDef(): LevelDef {
     const p = loadProgress();
     const open = CAMPAIGN.find((l) => !p.levels[l.id]);
     return open ?? CAMPAIGN[CAMPAIGN.length - 1]!;
@@ -112,7 +116,16 @@ export class Screens {
       sfx.click();
       this.start(endless);
     });
-    card.append(play, inf);
+    const together = el('button', 'big', '👥 Play together');
+    together.dataset.testid = 'btn-together';
+    together.append(el('small', '', 'Two phones, one ladder'));
+    together.addEventListener('click', () => {
+      sfx.unlock();
+      sfx.click();
+      this.menu.classList.add('hidden');
+      this.onTogether?.();
+    });
+    card.append(play, inf, together);
     if (running) {
       const resume = el('button', 'plain', 'Resume');
       resume.dataset.testid = 'menu-resume';

@@ -107,3 +107,8 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 - Levels s2/s3 reworked with the new patterns; s4 "Live broadcast" and s5 "Season finale" added (difficulty 0.7-1.0).
 - Studio extras: scrolling news ticker on the floor band, teleprompter next to the news set.
 - Newsreader: original bearded man in a dark suit with tie, flat style, replaces the generic presenter in news-desk.svg (no portrait of a real person).
+
+## Round: online two-player (phase 3)
+- See `docs/online.md`. Server-authoritative 60 Hz sim, 20 Hz snapshots, client prediction with a lead of `ceil((rtt/2 + 1.5 jitter + 20 ms)/16.7 ms)` ticks, own inputs replayed after each snapshot, correction offsets decay with tau 120 ms.
+- Room codes: 6 characters from a 31-letter alphabet, reconnect grace 60 s, rooms idle out after 10 min, per socket rate limits.
+- `scripts/serve.mjs` loads `apps/server/dist/online.mjs` (built by `pnpm build`) and attaches `/ws` to the same HTTP servers; `DD_SINGLE_PORT=1` disables the extra safety-net ports (used by e2e).

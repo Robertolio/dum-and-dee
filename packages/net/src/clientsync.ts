@@ -86,6 +86,13 @@ export class ClientSync {
     this.jitter = this.jitter + (dev - this.jitter) * 0.3;
   }
 
+  /** Start from an already measured clock (pings sent before the game began). */
+  seedClock(offset: number, rtt: number): void {
+    this.offset = offset;
+    this.rtt = rtt;
+    this.samples = [{ rtt, offset }];
+  }
+
   serverNow(clientNow: number): number {
     return clientNow + this.offset;
   }

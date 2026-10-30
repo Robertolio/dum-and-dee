@@ -1,5 +1,6 @@
 import type { GameScene } from '../scenes/GameScene';
 import type { Screens } from './screens';
+import type { OnlineUI } from './online';
 import { levelById } from '@dd/sim';
 import { sfx } from '../audio/sfx';
 import { fullscreenSupported, toggleFullscreen } from '../platform/fullscreen';
@@ -8,7 +9,7 @@ const IOS_HINT = 'iPhone: tap Share, then "Add to Home Screen", and open Dum & D
 const FS_HINT = 'Tip: Start also switches to fullscreen. Keep the phone in landscape.';
 
 /** Start screen shown before play: explains Solo mode, picks analog/digital, starts the game. */
-export function mountStartScreen(scene: GameScene, screens: Screens): void {
+export function mountStartScreen(scene: GameScene, screens: Screens, online?: OnlineUI): void {
   const root = document.getElementById('start');
   if (!root) return;
   if (new URLSearchParams(location.search).has('autostart')) {
@@ -46,7 +47,9 @@ export function mountStartScreen(scene: GameScene, screens: Screens): void {
     scene.controller.setSettings({ source: 'touch', posture });
     scene.refreshHints();
     root.classList.add('hidden');
-    screens.showMenu();
+    const room = new URLSearchParams(location.search).get('room');
+    if (room && online) online.joinFromLink(room);
+    else if (!(online && online.resumeSaved())) screens.showMenu();
     void toggleFullscreen();
   });
 }

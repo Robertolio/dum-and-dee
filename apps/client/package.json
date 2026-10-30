@@ -12,8 +12,10 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@dd/net": "workspace:*",
     "@dd/sim": "workspace:*",
-    "phaser": "^3.90.0"
+    "phaser": "^3.90.0",
+    "qrcode-generator": "^2.0.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",

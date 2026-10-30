@@ -4,6 +4,7 @@ import { GameScene } from './scenes/GameScene';
 import { mountDebugPanel } from './debug/panel';
 import { mountStartScreen } from './ui/start';
 import { Screens } from './ui/screens';
+import { OnlineUI } from './ui/online';
 import { levelById } from '@dd/sim';
 import { mountAudioButtons } from './audio/sfx';
 import { installWakeLockRecovery } from './platform/wakelock';
@@ -49,7 +50,9 @@ game.events.once(Phaser.Core.Events.READY, () => {
     mountInstallTip();
     exposeTestHooks(scene);
     const screens = new Screens(scene);
-    mountStartScreen(scene, screens);
+    const online = new OnlineUI(scene, screens);
+    screens.onTogether = () => online.showEntry();
+    mountStartScreen(scene, screens, online);
   };
   if (scene.scene.isActive()) mount();
   else scene.events.once(Phaser.Scenes.Events.CREATE, mount);

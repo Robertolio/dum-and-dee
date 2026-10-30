@@ -21,10 +21,20 @@ export default defineConfig({
       args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'],
     },
   },
-  webServer: {
-    command: `pnpm dev --port ${PORT}`,
-    url: `http://localhost:${PORT}/`,
-    reuseExistingServer: true,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: `pnpm dev --port ${PORT}`,
+      url: `http://localhost:${PORT}/`,
+      reuseExistingServer: true,
+      timeout: 60_000,
+    },
+    {
+      // Production server (static files + /ws) for the online tests; needs `pnpm build` first.
+      command: 'node ../../scripts/serve.mjs',
+      env: { PORT: '4600', DD_SINGLE_PORT: '1' },
+      url: 'http://localhost:4600/robots.txt',
+      reuseExistingServer: true,
+      timeout: 60_000,
+    },
+  ],
 });

@@ -20,6 +20,7 @@ import {
   type Tuning,
 } from '@dd/sim';
 import { CAMERA_LEAD, COLORS, FLOOR_Y, GAME_H, LADDER_SCREEN_FRACTION, PX } from '../config';
+import type { ClientSync } from '@dd/net';
 import { Controller } from '../input/controller';
 import { Hud } from '../render/hud';
 import { View } from '../render/view';
@@ -40,6 +41,8 @@ export class GameScene extends Phaser.Scene {
   paused = false;
   onEnd: ((kind: 'gameover' | 'complete') => void) | null = null;
   private hintsShown = new Set<number>();
+  /** Online play: prediction layer instead of the local sim loop. */
+  online: ClientSync | null = null;
   private curTheme: 'factory' | 'studio' = 'factory';
   private gateText: Phaser.GameObjects.Text | null = null;
   private bannerText: Phaser.GameObjects.Text | null = null;
@@ -373,6 +376,10 @@ export class GameScene extends Phaser.Scene {
       this.render();
       return;
     }
+    if (this.online) {
+      this.updateOnline(dt);
+      return;
+    }
     this.fpsSmoothed += (1000 / Math.max(1, deltaMs) - this.fpsSmoothed) * 0.05;
     this.updateInputScale();
     this.adaptQuality(dt);
@@ -401,6 +408,62 @@ export class GameScene extends Phaser.Scene {
     const target = this.targetCamX();
     this.view.camX += (target - this.view.camX) * Math.min(1, dt * 6);
 
+    this.announce();
+    this.showHints();
+    this.render();
+  }
+
+  /** Enter an online game: same level for both, own seat predicted, partner interpolated by the sync layer. */
+  startOnline(def: LevelDef, sync: ClientSync): void {
+    this.online = null;
+    this.levelDef = def;
+    this.paused = false;
+    this.curTheme = themeAtX(!!def.data.mixed, def.theme, 0);
+    this.commercial.clear();
+    this.applyTheme();
+    this.reset();
+    this.controller.lockSeat(sync.seat);
+    this.online = sync;
+  }
+
+  stopOnline(): void {
+    this.online = null;
+    this.controller.lockSeat(null);
+  }
+
+  private updateOnline(dt: number): void {
+    const sync = this.online!;
+    this.updateInputScale();
+    this.adaptQuality(dt);
+    const h = this.tuning.dt;
+    if (sync.running) {
+      let collected: GameEvent[] = [];
+      sync.advance(
+        performance.now(),
+        () => this.controller.sample(h)[sync.seat],
+        (s) => {
+          this.state = s;
+          this.lastInputs = [
+            { push: s.players[0].push, hTarget: s.players[0].hTarget },
+            { push: s.players[1].push, hTarget: s.players[1].hTarget },
+          ];
+          for (let i = 0; i < 2; i++) {
+            this.walkAmp[i] = advanceWalk(this.walk[i]!, s.players[i]!.x, h);
+            this.playMovementSounds(i);
+          }
+          this.handleEvents(s.events);
+          collected = collected.concat(s.events);
+        },
+      );
+      this.state = sync.getView(dt);
+      this.state.events = collected;
+    } else if (sync.ready) {
+      this.state = sync.getView(0);
+    }
+    for (let i = 0; i < 2; i++) this.oof[i] = Math.max(0, this.oof[i]! - dt);
+    this.shake = Math.max(0, this.shake - dt);
+    const target = this.targetCamX();
+    this.view.camX += (target - this.view.camX) * Math.min(1, dt * 6);
     this.announce();
     this.showHints();
     this.render();
@@ -604,12 +667,12 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'gameOver':
           sfx.gameOver();
-          this.time.delayedCall(900, () => this.onEnd?.('gameover'));
+          this.time.delayedCall(900, () => !this.online && this.onEnd?.('gameover'));
           break;
         case 'levelDone':
           sfx.cheer();
           this.burst(this.confetti, 60, this.scale.width / 2, 120);
-          this.time.delayedCall(1200, () => this.onEnd?.('complete'));
+          this.time.delayedCall(1200, () => !this.online && this.onEnd?.('complete'));
           break;
         case 'comboUp':
           sfx.pop();

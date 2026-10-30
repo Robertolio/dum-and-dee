@@ -6,6 +6,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     allowedHosts: true,
+    proxy: { '/ws': { target: 'ws://localhost:3000', ws: true } },
   },
   preview: {
     host: true,

@@ -133,7 +133,19 @@ export class Controller implements InputProvider {
     return true;
   }
 
+  private seatLock: 0 | 1 | null = null;
+
+  /** Online play: a touch anywhere controls this seat. */
+  lockSeat(seat: 0 | 1 | null): void {
+    this.seatLock = seat;
+    for (const slot of this.slots) {
+      slot.pointerId = null;
+      slot.latchedPush = 0;
+    }
+  }
+
   private slotFor(e: PointerEvent): number {
+    if (this.seatLock !== null) return this.seatLock;
     const rect = this.canvas.getBoundingClientRect();
     const fx = (e.clientX - rect.left) / Math.max(1, rect.width);
     return fx < 0.5 ? 0 : 1;

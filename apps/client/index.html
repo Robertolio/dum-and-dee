@@ -249,6 +249,34 @@
         color: #0b2411;
         font-weight: 800;
       }
+      .screen .lobby { max-width: min(640px, 94vw); max-height: 92vh; overflow: auto; }
+      .screen .lobby-top { display: flex; gap: 14px; align-items: center; justify-content: center; flex-wrap: wrap; }
+      .screen .code { font: 800 34px/1.1 ui-monospace, monospace; letter-spacing: 6px; margin: 2px 0 6px; color: #ffd36b; }
+      .screen .share { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+      .screen a.btn { display: inline-flex; align-items: center; background: #25a244; color: #fff; text-decoration: none; border-radius: 12px; padding: 8px 14px; font-size: 15px; min-height: 44px; box-sizing: border-box; }
+      .screen canvas.qr { background: #fff; border-radius: 8px; image-rendering: pixelated; }
+      .screen .seats { display: flex; gap: 10px; justify-content: center; margin: 10px 0; }
+      .screen button.seat { display: flex; flex-direction: column; gap: 2px; min-width: 130px; padding: 8px; }
+      .screen button.seat.dum { border-color: #6aa0ff; }
+      .screen button.seat.dee { border-color: #ff7c70; }
+      .screen button.seat.mine { background: #2c5d66; }
+      .screen button.seat.free { opacity: 0.75; border-style: dashed; }
+      .screen .ctl { display: flex; gap: 6px; align-items: center; justify-content: center; margin: 6px 0; flex-wrap: wrap; }
+      .screen .ctl button.active, .screen button.active { background: #3a7c88; border-color: #fff; }
+      .screen .sub { font-size: 13px; opacity: 0.85; margin: 4px 0; }
+      .screen .err { color: #ff9a9a; min-height: 1.2em; margin: 4px 0; font-size: 13px; }
+      .screen .join-row { display: flex; gap: 8px; justify-content: center; align-items: center; }
+      .screen input.code-input { width: 8.5em; text-align: center; font: 700 22px ui-monospace, monospace; letter-spacing: 4px; text-transform: uppercase; padding: 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.4); background: #0b2a30; color: #fff; }
+      .screen .countdown { font-size: 90px; font-weight: 900; color: #ffd36b; text-shadow: 0 4px 0 #000; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); border-radius: 16px; }
+      .screen .countdown.hidden { display: none; }
+      .screen .lobby { position: relative; }
+      #online-overlay { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); color: #fff; font-family: system-ui, sans-serif; text-align: center; }
+      #online-overlay.hidden, .net-badge.hidden { display: none; }
+      #online-overlay .card { background: #12363d; border-radius: 16px; padding: 18px 22px; max-width: min(420px, 90vw); }
+      #online-overlay button { background: #1d4d55; color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; padding: 8px 14px; font-size: 15px; min-height: 44px; margin: 4px; }
+      #online-overlay button.primary { background: #3fb768; color: #0b2411; font-weight: 800; }
+      #online-overlay button.link { background: none; border: none; text-decoration: underline; }
+      .net-badge { position: fixed; left: max(48px, calc(env(safe-area-inset-left) + 44px)); bottom: max(12px, env(safe-area-inset-bottom)); z-index: 30; font: 12px system-ui, sans-serif; color: #dff3f5; background: rgba(0,0,0,0.45); padding: 3px 8px; border-radius: 10px; }
       .screen .buttons {
         display: flex;
         gap: 10px;
