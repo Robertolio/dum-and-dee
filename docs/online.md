@@ -66,3 +66,5 @@ Server to client: `hello`, `joined {room, token, seat, host}`, `room {phase, lev
 ## Not tested
 
 No real phones, no real mobile networks, no iOS Safari lock/unlock behaviour (only simulated by closing the socket), no load test beyond the unit-level limits, no TURN/NAT issues (not relevant: plain WebSocket over HTTPS), no Android back-button handling, no QR scan with a real camera (the QR comes from a library, rendered and visually checked).
+
+Against production: `E2E_BASE=https://ddclient-production-47c1.up.railway.app npx playwright test e2e/online.spec.ts` (run once after the deploy of this feature: passed, two browser contexts over wss through the Railway proxy, states within 0.1 we).

@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
-test.use({ baseURL: 'http://localhost:4600' });
+test.use({ baseURL: process.env.E2E_BASE ?? 'http://localhost:4600' });
 
 async function open(ctx: BrowserContext, url: string): Promise<Page> {
   const page = await ctx.newPage();
