@@ -78,9 +78,20 @@ if (!existsSync(join(root, 'index.html'))) {
 
 // Primary port from Railway, plus the usual dev/preview ports as a safety net in case the public
 // domain's target port was set to one of them in Railway's networking settings.
-const ports = [...new Set([port, 4173, 5173, 3000, 8080])];
+const ports = process.env.DD_SINGLE_PORT ? [port] : [...new Set([port, 4173, 5173, 3000, 8080])];
+const servers = [];
 for (const p of ports) {
   const srv = server();
+  servers.push(srv);
   srv.on('error', (e) => console.error(`port ${p}: ${e.code ?? e.message}`));
   srv.listen(p, '0.0.0.0', () => console.log(`Serving ${root} on 0.0.0.0:${p}${p === port ? ' (PORT)' : ''}`));
+}
+
+// Online two-player endpoint (/ws) on the same HTTP ports. Static serving keeps working if it fails to load.
+try {
+  const online = await import('../apps/server/dist/online.mjs');
+  online.attachOnline(servers);
+  console.log('Online play: WebSocket endpoint at /ws');
+} catch (e) {
+  console.error('Online play disabled:', e?.message ?? e);
 }

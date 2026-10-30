@@ -6,9 +6,9 @@
   "packageManager": "pnpm@10.33.4",
   "scripts": {
     "dev": "pnpm --filter @dd/client dev",
-    "build": "pnpm --filter @dd/sim build && pnpm --filter @dd/client build",
+    "build": "pnpm --filter @dd/sim build && pnpm --filter @dd/net build && pnpm --filter @dd/server build && pnpm --filter @dd/client build",
     "preview": "pnpm --filter @dd/client preview",
-    "test": "pnpm --filter @dd/sim test",
+    "test": "pnpm --filter @dd/sim test && pnpm --filter @dd/net test",
     "test:e2e": "pnpm --filter @dd/client test:e2e",
     "typecheck": "pnpm -r typecheck",
     "start": "node scripts/serve.mjs"
