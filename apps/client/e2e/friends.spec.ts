@@ -129,6 +129,15 @@ test.describe('Invite landing', () => {
     await ctx.close();
   });
 
+  test('invite param with trailing text still yields the code and the simple flow, no lobby', async ({ browser }) => {
+    const raw = encodeURIComponent('ROB-JJ2 \u2014 my code is ROB-JJ2');
+    const { ctx, page } = await fresh(browser, `/?invite=${raw}`);
+    await page.getByTestId('btn-play').click();
+    await expect(page.getByTestId('onb-invite')).toHaveValue('ROB-JJ2');
+    await expect(page.locator('[data-testid^="lobby-"], [data-testid="online-ready"]')).toHaveCount(0);
+    await ctx.close();
+  });
+
   test('desktop/Android with ?invite: first start prefills the invite code', async ({ browser }) => {
     const { ctx, page } = await fresh(browser, '/?invite=ROB-7K2');
     await page.getByTestId('btn-play').click();

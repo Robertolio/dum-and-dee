@@ -76,6 +76,7 @@ function exposeTestHooks(scene: GameScene): void {
     },
     setInputOverride: (inputs: [PlayerInput, PlayerInput] | null) => scene.controller.setOverride(inputs),
     lastInputs: () => scene.lastInputs,
+    levelId: () => scene.levelDef.id,
     reset: () => scene.reset(),
     quality: () => scene.quality,
     startLevel: (id: string) => scene.startLevel(levelById(id)),

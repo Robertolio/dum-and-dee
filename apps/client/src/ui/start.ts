@@ -21,6 +21,11 @@ export function mountStartScreen(scene: GameScene, screens: Screens, online?: On
     scene.controller.setSettings(initialControls());
     scene.refreshHints();
     void toggleFullscreen();
+    const jump = CAMPAIGN.find((l) => l.id === q.get('level'));
+    if (jump) {
+      screens.start(jump);
+      return;
+    }
     const room = q.get('room');
     if (room && online) {
       online.joinFromLink(room);
@@ -36,7 +41,8 @@ export function mountStartScreen(scene: GameScene, screens: Screens, online?: On
   screens.onFriend = () => {
     scene.controller.setSettings(initialControls());
     void toggleFullscreen();
-    friends?.showFriends();
+    if (inviteFromUrl() && friends) friends.afterStart(() => friends.showFriends());
+    else friends?.showFriends();
   };
   screens.showMenu();
 }

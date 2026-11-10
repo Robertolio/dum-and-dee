@@ -103,3 +103,20 @@ test.describe('Desktop', () => {
     await expect(page.getByTestId('coach')).not.toContainText('thumb');
   });
 });
+
+test.describe('TV Studio shortcut', () => {
+  test('menu button and ?level=s1 start the studio without touching progress', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => (window as any).__dd !== undefined);
+    await page.getByTestId('menu-button').click();
+    await page.getByTestId('panel-tvstudio').click();
+    await page.waitForFunction(() => (window as any).__dd.getState().tick > 5);
+    expect(await page.evaluate(() => (window as any).__dd.levelId())).toBe('s1');
+    await page.goto('/?level=s1');
+    await page.waitForFunction(() => (window as any).__dd !== undefined);
+    await page.getByTestId('btn-play').click();
+    await page.waitForFunction(() => (window as any).__dd.getState().tick > 5);
+    expect(await page.evaluate(() => (window as any).__dd.levelId())).toBe('s1');
+    expect(await page.evaluate(() => localStorage.getItem('dd-progress'))).toBeNull();
+  });
+});

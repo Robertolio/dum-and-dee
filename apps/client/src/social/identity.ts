@@ -54,7 +54,13 @@ export const isStandalone = (): boolean =>
 
 export const isIos = (): boolean => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-export function inviteFromUrl(): string | null {
-  const v = new URLSearchParams(location.search).get('invite');
-  return v && /^[A-Za-z0-9-]{3,8}$/.test(v) ? v.toUpperCase() : null;
+export function parseInviteCode(raw: string | null): string | null {
+  if (!raw) return null;
+  const v = raw.toUpperCase();
+  const m = /(?<![A-Z0-9])[A-Z]{3}-[A-Z0-9]{3}(?![A-Z0-9])/.exec(v);
+  if (m) return m[0];
+  const bare = /^\s*([A-Z]{3})([A-Z0-9]{3})\s*$/.exec(v);
+  return bare ? `${bare[1]}-${bare[2]}` : null;
 }
+
+export const inviteFromUrl = (): string | null => parseInviteCode(new URLSearchParams(location.search).get('invite'));

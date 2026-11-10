@@ -69,4 +69,21 @@ test.describe('Play with a friend: no lobby, no codes', () => {
     await expect(p.getByTestId('online-error')).toContainText('does not exist', { timeout: 8000 });
     await ctx.close();
   });
+
+  test('an old ?room= link joins through the simple flow, never a lobby', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const { A, B } = await twoFriends(browser);
+    await A.page.getByTestId('play-Mia').click();
+    await expect(A.page.getByTestId('wait-title')).toBeVisible();
+    const code = await A.page.evaluate(() => (window as any).__online.client.code as string);
+    const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+    await skipIdentity(ctx);
+    const p = await ctx.newPage();
+    await p.goto(`/?room=${code}`);
+    await p.waitForFunction(() => (window as any).__dd !== undefined);
+    await p.getByTestId('btn-play').click();
+    await expect(p.getByTestId('online-count')).toBeVisible({ timeout: 10_000 });
+    await expect(p.locator('[data-testid^="lobby-"]:not([data-testid="lobby-nudge"]), .qr, [data-testid="online-ready"]')).toHaveCount(0);
+    await ctx.close();
+  });
 });

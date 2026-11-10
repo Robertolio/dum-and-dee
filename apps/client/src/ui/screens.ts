@@ -90,6 +90,13 @@ export class Screens {
     const running = this.scene.state.tick > 0 && !this.scene.state.gameOver && !this.scene.state.finished;
     if (levels) {
       card.append(el('h2', '', 'Levels'));
+      const tv = el('button', 'primary', 'TV Studio');
+      tv.dataset.testid = 'btn-tvstudio';
+      tv.addEventListener('click', () => {
+        sfx.click();
+        this.start(levelById('s1'));
+      });
+      card.append(tv);
       const row = el('div', 'levels');
       for (const d of CAMPAIGN) {
         const b = el('button', 'level');
@@ -176,6 +183,7 @@ export class Screens {
     };
     if (running) add('Resume', 'panel-resume', () => this.hideAll(), 'primary');
     add('∞ Endless', 'btn-endless', () => this.start(levelById('endless')));
+    add('TV Studio', 'panel-tvstudio', () => this.start(levelById('s1')));
     add('Levels', 'btn-levels', () => this.showMenu(true));
     add('Friends', 'btn-friends', () => {
       this.menu.classList.add('hidden');

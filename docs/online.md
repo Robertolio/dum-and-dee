@@ -181,3 +181,8 @@ Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per h
 - In portrait only the Rotate notice is visible.
 - e2e: `online.spec.ts` now goes through the friends flow (invite, join, automatic countdown, reconnect, leave, cancel, dead link). Test servers accept `REGISTRATIONS_PER_HOUR_PER_IP` and `CODE_ATTEMPTS_PER_MINUTE` overrides.
 - Not done: the optional Dum/Dee swap.
+
+### Landing links and level shortcuts
+- `?invite=` is parsed to the first code-shaped token (`ABC-XYZ`, case-insensitive; extra text after it is ignored). It opens the simple flow: name if needed, friend request, then banner/Join. `?room=CODE` joins through the same waiting/countdown screens. There is no lobby UI and no QR code any more (`qrcode-generator` removed).
+- WhatsApp text: `Play Dum & Dee with me: <origin>/?invite=CODE — my code is CODE`; the link only carries the code.
+- Testing: `?level=s1` (any campaign id) starts that level after Play; `?autostart&level=...` starts at once. The menu and the Levels list have a TV Studio button (starts s1). All levels are always open; progress is only written on completion.
