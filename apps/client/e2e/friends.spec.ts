@@ -82,15 +82,13 @@ test.describe('Identity and friends', () => {
     await expect(b.getByTestId('friend-Rob')).toContainText('Ladder Pros');
 
     await a.getByTestId('play-Mia').click();
-    const codeEl = a.getByTestId('lobby-code');
-    await expect(codeEl).toHaveText(/^[A-Z2-9]{6}$/);
-    const room = (await codeEl.textContent())!;
-    await expect(a.getByTestId('lobby-invite-note')).toContainText('sees your invite');
+    await expect(a.getByTestId('wait-title')).toContainText('Waiting for Mia');
+    await expect(a.getByTestId('wait-invite-note')).toContainText('sees your invite');
 
     await expect(b.getByTestId('invite-banner')).toContainText('Rob is waiting');
     await b.getByTestId('invite-join').click();
-    await expect(b.getByTestId('lobby-code')).toHaveText(room);
-    await expect(a.getByTestId('lobby-seat-1')).toContainText('Partner');
+    await expect(b.getByTestId('online-count')).toBeVisible({ timeout: 10_000 });
+    await expect(a.getByTestId('online-count')).toBeVisible({ timeout: 10_000 });
 
     await A.ctx.close();
     await B.ctx.close();

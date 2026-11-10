@@ -175,7 +175,7 @@ export class FriendsUI {
         this.banner.classList.add('hidden');
         this.screens.hideAll();
         this.close();
-        this.online.joinFromLink(first.room);
+        this.online.joinFromLink(first.room, first.name);
       }, 'primary'),
       btn('✕', 'invite-dismiss', () => {
         this.liveInvites.delete(first.id);
@@ -339,7 +339,7 @@ export class FriendsUI {
     const top = el('div', 'me-box');
     const name = tid(el('b', '', me?.name ?? loadIdentity()?.name ?? ''), 'friends-me-name');
     const code = tid(el('div', 'code', me?.code ?? '…'), 'friends-my-code');
-    top.append(el('small', '', 'Your friend code'), code, name);
+    top.append(el('h3', '', 'Invite a friend'), el('small', '', 'Send the link. They open it, add the game to their home screen and enter your code:'), code, name);
     const share = el('div', 'share');
     const copy = btn('Copy code', 'friends-copy', () => {
       const c = this.social.me?.code ?? '';
@@ -381,11 +381,10 @@ export class FriendsUI {
     add.append(input, go);
     const err = tid(el('p', 'err'), 'friends-error');
     this.errBox = err;
-    card.append(el('h3', '', 'Add a friend by code'), add, err);
-
     this.lists = el('div', 'flist');
     card.append(this.lists);
     this.renderLists();
+    card.append(el('h3', '', "Got a friend's code?"), add, err);
 
     const foot = el('div', 'buttons wrap');
     foot.append(

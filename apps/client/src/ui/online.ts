@@ -1,4 +1,3 @@
-import qrcode from 'qrcode-generator';
 import { CAMPAIGN, levelById, type LevelDef } from '@dd/sim';
 import { normalizeCode, type EndMsg, type Seat } from '@dd/net';
 import type { GameScene } from '../scenes/GameScene';
@@ -49,7 +48,9 @@ export class OnlineUI {
   private inGame = false;
   private error = '';
   private lastLevelSent = '';
-  private levelMode: 'play' | 'endless' = 'play';
+  private setupSent = false;
+  private autoReady = true;
+  private partnerName = '';
   private resultBox: HTMLElement | null = null;
   private inviteAfterCreate: FriendView | null = null;
   private inviteNote: { name: string; delivered: 'live' | 'push' | 'none' | 'pending' } | null = null;
@@ -77,70 +78,42 @@ export class OnlineUI {
 
   // ---- entry points ----
 
-  showEntry(code = '', error = ''): void {
-    this.screens.hideAll();
+  private showNotice(text: string): void {
     this.scene.paused = true;
-    const card = el('div', 'card');
-    card.append(el('h2', '', 'Play together'), el('p', 'sub', 'Two phones, one ladder. One of you starts a game, the other joins with the code.'));
-    const nw = tid(el('button', 'primary big', 'New game'), 'online-new');
-    nw.addEventListener('click', () => {
-      sfx.unlock();
-      sfx.click();
-      this.inviteNote = null;
-      this.client.create();
-      this.showWait('Creating game…');
-    });
-    const input = tid(el('input', 'code-input'), 'online-code-input');
-    input.placeholder = 'CODE';
-    input.maxLength = 6;
-    input.autocapitalize = 'characters';
-    input.autocomplete = 'off';
-    input.spellcheck = false;
-    input.value = code;
-    const go = tid(el('button', 'big', 'Join'), 'online-join-go');
-    const msg = tid(el('p', 'err', error), 'online-error');
-    const doJoin = (): void => {
-      const c = normalizeCode(input.value);
-      if (!c) {
-        msg.textContent = 'Enter the 6-character code.';
-        return;
-      }
-      sfx.unlock();
-      sfx.click();
-      this.client.join(c);
-      this.showWait('Joining…');
-    };
-    go.addEventListener('click', doJoin);
-    input.addEventListener('keydown', (e) => e.key === 'Enter' && doJoin());
-    const row = el('div', 'join-row');
-    row.append(input, go);
-    const back = tid(el('button', 'link', 'Back'), 'online-back');
-    back.addEventListener('click', () => {
+    const card = el('div', 'card narrow');
+    const ok = tid(el('button', 'primary', 'OK'), 'online-notice-ok');
+    ok.addEventListener('click', () => {
       sfx.click();
       this.root.classList.add('hidden');
       this.screens.showMenu();
     });
-    card.append(nw, el('p', 'sub', 'or join a friend'), row, msg, back);
+    card.append(tid(el('h2', '', text), 'online-error'), ok);
     this.root.replaceChildren(card);
     this.root.classList.remove('hidden');
   }
 
+
   /** 'Play with <name>': open a room and tell the friend (live, push, or a WhatsApp nudge as last resort). */
   playWith(friend: FriendView): void {
     this.scene.paused = true;
+    this.resetFlow();
     this.inviteAfterCreate = friend;
+    this.partnerName = friend.name;
     this.inviteNote = { name: friend.name, delivered: 'pending' };
     this.client.create();
     this.showWait('Creating game…');
   }
 
-  joinFromLink(code: string): void {
+  joinFromLink(code: string, partner = ''): void {
     const c = normalizeCode(code);
     this.scene.paused = true;
     if (!c) {
-      this.showEntry();
+      this.showNotice('That game is not open (anymore).');
       return;
     }
+    this.resetFlow();
+    this.partnerName = partner;
+    this.inviteNote = null;
     this.client.join(c);
     this.showWait('Joining…');
   }
@@ -150,6 +123,7 @@ export class OnlineUI {
     const s = OnlineClient.savedSession();
     if (!s) return false;
     this.scene.paused = true;
+    this.resetFlow();
     this.client.join(s.room, s.token);
     this.showWait('Reconnecting…');
     return true;
@@ -177,14 +151,14 @@ export class OnlineUI {
           this.inviteAfterCreate = null;
         }
         if (e.room.phase === 'lobby') {
-          if (this.inGame) this.leaveGameView();
+          if (this.inGame && !this.resultBox) this.leaveGameView();
           this.renderLobby();
         } else if (e.room.phase === 'countdown') this.renderLobby();
         else if (e.room.phase === 'paused') this.showPause(this.pauseUntil || performance.now() + 60000);
         break;
       case 'count':
         this.countAt = e.at;
-        this.startCountdown();
+        this.showCountdown();
         break;
       case 'start':
         this.startGame(e.level, e.sync);
@@ -206,7 +180,7 @@ export class OnlineUI {
         this.error = ERRORS[e.code] ?? `Error: ${e.code}`;
         if (e.code === 'connect_failed' || e.code === 'no_such_room' || e.code === 'room_full' || e.code === 'in_progress' || e.code === 'server_full' || e.code === 'rate_limited') {
           this.client.leave();
-          this.showEntry('', this.error);
+          this.showNotice(this.error);
         }
         break;
       case 'status':
@@ -256,7 +230,23 @@ export class OnlineUI {
     this.badge.classList.add('hidden');
   }
 
-  // ---- lobby ----
+  // ---- waiting (there is no lobby: host is Dum, the other is Dee, the game starts by itself) ----
+
+  private resetFlow(): void {
+    this.setupSent = false;
+    this.autoReady = true;
+    this.lastLevelSent = '';
+    clearInterval(this.countTimer);
+  }
+
+  private autoSetup(r: RoomView, both: boolean): void {
+    if (!this.setupSent) {
+      this.setupSent = true;
+      this.client.setCtl(this.scene.controller.settings().posture);
+      if (r.you === r.host) this.sendLevel();
+    }
+    if (this.autoReady && both && r.phase === 'lobby' && !r.seats[r.you]?.ready) this.client.setReady(true);
+  }
 
   private renderLobby(): void {
     const r = this.room;
@@ -264,106 +254,50 @@ export class OnlineUI {
     this.scene.paused = true;
     this.screens.hideAll();
     this.scene.paused = true;
-    if (r.you === r.host && this.lastLevelSent === '') this.sendLevel();
-    const link = `${location.origin}/?room=${r.code}`;
-    const card = el('div', 'card lobby');
-    card.append(el('h2', '', 'Play together'));
-    const top = el('div', 'lobby-top');
-    const left = el('div', 'lobby-left');
-    left.append(el('small', '', 'Room code'), tid(el('div', 'code', r.code), 'lobby-code'));
-    const row = el('div', 'share');
-    const text = `Play Dum & Dee with me! ${link}`;
-    const wa = tid(el('a', 'btn wa', 'Share via WhatsApp'), 'lobby-share-wa');
-    wa.href = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    wa.target = '_blank';
-    wa.rel = 'noopener';
-    const copy = tid(el('button', '', 'Copy link'), 'lobby-copy');
-    copy.addEventListener('click', () => {
-      sfx.click();
-      void navigator.clipboard?.writeText(link).then(
-        () => (copy.textContent = 'Copied!'),
-        () => (copy.textContent = link),
-      );
-    });
-    row.append(wa, copy);
-    if (typeof navigator.share === 'function') {
-      const sh = tid(el('button', '', 'Share…'), 'lobby-share');
-      sh.addEventListener('click', () => void navigator.share({ title: 'Dum & Dee', text: 'Play Dum & Dee with me!', url: link }).catch(() => undefined));
-      row.append(sh);
+    const both = !!(r.seats[0]?.connected && r.seats[1]?.connected);
+    this.autoSetup(r, both);
+    if (r.phase === 'countdown') {
+      this.showCountdown();
+      return;
     }
-    left.append(row);
-    const me = r.seats[r.you];
-    const both = r.seats[0] && r.seats[1];
-    const ready = tid(el('button', me?.ready ? 'primary big active' : 'primary big', me?.ready ? 'Ready ✓' : 'Ready'), 'lobby-ready');
-    ready.addEventListener('click', () => {
-      sfx.unlock();
-      sfx.click();
-      this.client.setReady(!me?.ready);
-    });
-    const status = tid(el('p', 'sub', this.statusText(r, !!both)), 'lobby-status');
-    left.append(ready, status);
-    if (this.inviteNote) left.append(this.inviteNoteEl(link, r.code));
-    const qr = tid(el('canvas', 'qr'), 'lobby-qr');
-    this.drawQr(qr, link);
-    top.append(left, qr);
-    card.append(top);
-
-    const seats = el('div', 'seats');
-    for (const s of [0, 1] as const) seats.append(this.seatCard(r, s));
-    card.append(seats);
-
-    const ctl = el('div', 'ctl');
-    ctl.append(el('small', '', 'Your controls'));
-    for (const m of ['analog', 'digital'] as const) {
-      const b = tid(el('button', this.scene.controller.settings().posture === m ? 'active' : '', m === 'analog' ? 'Analog' : 'Digital'), `lobby-ctl-${m}`);
-      b.addEventListener('click', () => {
-        sfx.click();
-        this.scene.controller.setSettings({ posture: m });
-        this.scene.refreshHints();
-        this.client.setCtl(m);
-      });
-      ctl.append(b);
-    }
-    card.append(ctl);
-
+    const card = el('div', 'card narrow');
     const host = r.you === r.host;
-    const lv = el('div', 'ctl');
-    if (host) {
-      const cont = this.screens.continueDef();
-      const started = Object.keys(loadProgress().levels).length > 0;
-      lv.append(el('small', '', 'Level'));
-      const bp = tid(el('button', this.levelMode === 'play' ? 'active' : '', started ? `Continue: ${cont.name}` : `Play: ${CAMPAIGN[0]!.name}`), 'lobby-level-play');
-      const be = tid(el('button', this.levelMode === 'endless' ? 'active' : '', '∞ Endless'), 'lobby-level-endless');
-      bp.addEventListener('click', () => {
+    const name = this.partnerName;
+    const title = both ? 'Get ready…' : host ? (name ? `Waiting for ${name}…` : 'Waiting for your friend…') : 'Joining…';
+    card.append(tid(el('h2', '', title), 'wait-title'), el('p', 'sub', `You are ${r.you === 0 ? 'Dum (left)' : 'Dee (right)'}`));
+    if (host && this.inviteNote && !both) card.append(this.inviteNoteEl(`${location.origin}/?room=${r.code}`));
+    if (both && !this.autoReady) {
+      const go = tid(el('button', 'primary big', 'Play again'), 'online-play-again');
+      go.addEventListener('click', () => {
+        sfx.unlock();
         sfx.click();
-        this.levelMode = 'play';
-        this.sendLevel();
+        this.autoReady = true;
+        this.client.setReady(true);
+        this.renderLobby();
       });
-      be.addEventListener('click', () => {
-        sfx.click();
-        this.levelMode = 'endless';
-        this.sendLevel();
-      });
-      lv.append(bp, be);
-    } else lv.append(el('small', '', 'Level'), tid(el('b', '', levelById(r.level).name), 'lobby-level'), el('small', '', '(chosen by the host)'));
-    card.append(lv);
-
-    const leave = tid(el('button', 'link', 'Leave'), 'lobby-leave');
-    leave.addEventListener('click', () => {
+      card.append(go);
+    }
+    const cancel = tid(el('button', 'link', both && !this.autoReady ? 'Leave' : 'Cancel'), 'wait-cancel');
+    cancel.addEventListener('click', () => {
       sfx.click();
       this.leaveToMenu();
     });
-    card.append(leave);
-    const count = tid(el('div', 'countdown hidden'), 'lobby-count');
-    card.append(count);
+    card.append(cancel);
     this.root.replaceChildren(card);
     this.root.classList.remove('hidden');
-    if (r.phase === 'countdown') this.startCountdown();
   }
 
-  private inviteNoteEl(link: string, code: string): HTMLElement {
+  private showCountdown(): void {
+    const card = el('div', 'card narrow');
+    card.append(el('p', 'sub', 'Get your thumb ready'), tid(el('div', 'bigcount'), 'online-count'));
+    this.root.replaceChildren(card);
+    this.root.classList.remove('hidden');
+    this.startCountdown();
+  }
+
+  private inviteNoteEl(link: string): HTMLElement {
     const n = this.inviteNote!;
-    const box = tid(el('div', 'invite-note'), 'lobby-invite-note');
+    const box = tid(el('div', 'invite-note'), 'wait-invite-note');
     if (n.delivered === 'pending') {
       box.append(el('small', '', `Telling ${n.name}…`));
     } else if (n.delivered === 'none') {
@@ -374,66 +308,22 @@ export class OnlineUI {
       wa.rel = 'noopener';
       box.append(wa);
     } else box.append(el('small', '', n.delivered === 'live' ? `${n.name} is online and sees your invite.` : `${n.name} got a notification.`));
-    void code;
     return box;
   }
 
-  private statusText(r: RoomView, both: boolean): string {
-    if (!both) return 'Waiting for your partner to join…';
-    const other = r.seats[(1 - r.you) as Seat];
-    if (r.seats[r.you]?.ready && !other?.ready) return 'Waiting for your partner to press Ready…';
-    if (!r.seats[r.you]?.ready) return 'Press Ready when you are set.';
-    return 'Starting…';
-  }
-
-  private seatCard(r: RoomView, s: Seat): HTMLElement {
-    const info = r.seats[s];
-    const mine = r.you === s;
-    const c = tid(el('button', `seat ${s === 0 ? 'dum' : 'dee'}${mine ? ' mine' : ''}`), `lobby-seat-${s}`);
-    c.append(el('b', '', s === 0 ? 'Dum' : 'Dee'));
-    c.append(el('span', '', mine ? 'You' : info ? (info.connected ? 'Partner' : 'Partner (offline)') : 'Free'));
-    if (info) c.append(el('small', '', `${info.ctl}${info.ready ? ' · ready' : ''}`));
-    if (!info && !mine) {
-      c.classList.add('free');
-      c.addEventListener('click', () => {
-        sfx.click();
-        this.client.setSeat(s);
-      });
-    }
-    return c;
-  }
-
   private sendLevel(): void {
-    const id = this.levelMode === 'endless' ? 'endless' : this.screens.continueDef().id;
+    const id = this.screens.continueDef().id;
     this.lastLevelSent = id;
     this.client.setLevel(id);
   }
 
-  private drawQr(canvas: HTMLCanvasElement, text: string): void {
-    const qr = qrcode(0, 'M');
-    qr.addData(text);
-    qr.make();
-    const n = qr.getModuleCount();
-    const scale = 4;
-    const quiet = 2;
-    const size = (n + quiet * 2) * scale;
-    canvas.width = size;
-    canvas.height = size;
-    const g = canvas.getContext('2d')!;
-    g.fillStyle = '#fff';
-    g.fillRect(0, 0, size, size);
-    g.fillStyle = '#000';
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
-    canvas.style.width = '132px';
-    canvas.style.height = '132px';
-  }
 
   // ---- countdown / game ----
 
   private startCountdown(): void {
     clearInterval(this.countTimer);
     const tick = (): void => {
-      const box = this.root.querySelector<HTMLElement>('[data-testid="lobby-count"]');
+      const box = this.root.querySelector<HTMLElement>('[data-testid="online-count"]');
       if (!box) return;
       const left = Math.ceil((this.countAt - this.client.serverNow()) / 1000);
       box.classList.toggle('hidden', left <= 0);
@@ -455,6 +345,7 @@ export class OnlineUI {
     this.screens.hideAll();
     this.scene.startOnline(def, sync);
     this.lastLevelSent = '';
+    this.setupSent = true;
     this.updateBadge();
   }
 
@@ -494,15 +385,23 @@ export class OnlineUI {
     } else {
       card.append(el('h2', '', 'Game over'), el('p', 'big', `Score ${end.score}`), el('p', '', `Distance ${end.distance} m`));
     }
-    const back = tid(el('button', 'primary', 'Back to lobby'), 'online-result-back');
+    this.autoReady = false;
+    const back = tid(el('button', 'primary', 'Play again'), 'online-result-back');
     back.addEventListener('click', () => {
+      sfx.unlock();
+      sfx.click();
       this.overlay.classList.add('hidden');
       this.resultBox = null;
       this.inGame = false;
       this.badge.classList.add('hidden');
+      this.autoReady = true;
+      this.sendLevel();
+      this.client.setReady(true);
       if (this.room) this.renderLobby();
     });
-    card.append(back);
+    const leave = tid(el('button', 'link', 'Leave'), 'online-result-leave');
+    leave.addEventListener('click', () => this.leaveToMenu());
+    card.append(back, leave);
     this.resultBox = tid(card, 'online-result');
     this.overlay.replaceChildren(card);
     this.overlay.classList.remove('hidden');
