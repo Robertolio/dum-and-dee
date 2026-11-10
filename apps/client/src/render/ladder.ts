@@ -87,9 +87,27 @@ export function drawBoat(g: Phaser.GameObjects.Graphics, view: View, s: GameStat
   const nx = uy;
   const ny = -ux;
   const ext = 26;
-  const x0 = ax - ux * ext;
-  const y0 = ay - uy * ext;
-  const L = len + ext * 2;
+  drawSkiff(g, ax - ux * ext, ay - uy * ext, ux, uy, len + ext * 2, 100 - Math.max(0, Math.min(100, s.bucket.water)));
+}
+
+export interface Dol {
+  /** Screen position of the oarlock (dol) on the visible side, and of its far-side twin. */
+  x: number;
+  y: number;
+  fx: number;
+  fy: number;
+}
+
+/** Riggers at these hull positions (0..1): the seats of Dum and Dee. */
+export const RIGGER_AT = [0.36, 0.66] as const;
+
+/**
+ * The skiff hull from (x0, y0) along the unit vector (ux, uy), length L px, with damage 0..100.
+ * Riggers (brackets with a dol and a dolpen) stand on the visible side; a fainter pair shows the far side.
+ */
+export function drawSkiff(g: Phaser.GameObjects.Graphics, x0: number, y0: number, ux: number, uy: number, L: number, damage: number): Dol[] {
+  const nx = uy;
+  const ny = -ux;
   const pt = (d: number, off: number): [number, number] => [x0 + ux * L * d + nx * off, y0 + uy * L * d + ny * off];
   const depth = (d: number): number => 24 * Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, d))), 0.75);
   const rise = (d: number): number => 10 + 8 * Math.pow(2 * Math.abs(d - 0.5), 2);
@@ -108,6 +126,16 @@ export function drawBoat(g: Phaser.GameObjects.Graphics, view: View, s: GameStat
     g.fillPath();
   };
   const hull = [...top, ...bottom.slice().reverse()];
+  const dols: Dol[] = RIGGER_AT.map((d) => {
+    const [bx0, by0] = pt(d, rise(d));
+    const far = [bx0 - ux * 5 + nx * 2, by0 - uy * 5 + ny * 2] as const;
+    g.lineStyle(2, 0x9aa3ac, 0.55);
+    g.lineBetween(far[0] - ux * 9, far[1] - uy * 9, far[0] + ux * 3 + nx * 18, far[1] + uy * 3 + ny * 18);
+    g.lineBetween(far[0] + ux * 9, far[1] + uy * 9, far[0] + ux * 3 + nx * 18, far[1] + uy * 3 + ny * 18);
+    g.fillStyle(0x9aa3ac, 0.55);
+    g.fillCircle(far[0] + ux * 3 + nx * 19, far[1] + uy * 3 + ny * 19, 5);
+    return { x: bx0 + nx * 21 + ux * 5, y: by0 + ny * 21 + uy * 5, fx: far[0] + ux * 3 + nx * 12, fy: far[1] + uy * 3 + ny * 12 };
+  });
   g.fillStyle(0x8d96a0);
   poly(hull.map(([x, y]) => [x + nx * -2, y + ny * -2] as [number, number]));
   g.fillStyle(WHITE);
@@ -135,7 +163,21 @@ export function drawBoat(g: Phaser.GameObjects.Graphics, view: View, s: GameStat
   g.fillCircle(pt(0.015, 2)[0], pt(0.015, 2)[1], 4);
   g.fillCircle(pt(0.985, 2)[0], pt(0.985, 2)[1], 4);
 
-  const damage = 100 - Math.max(0, Math.min(100, s.bucket.water));
+  for (const dl of dols) {
+    const bx0 = dl.x - nx * 21 - ux * 5;
+    const by0 = dl.y - ny * 21 - uy * 5;
+    g.lineStyle(5, 0x4a525a, 1);
+    g.lineBetween(bx0 - ux * 15, by0 - uy * 15, dl.x, dl.y);
+    g.lineBetween(bx0 + ux * 9, by0 + uy * 9, dl.x, dl.y);
+    g.lineStyle(3, 0x4a525a, 1);
+    g.lineBetween(dl.x - nx * 3, dl.y - ny * 3, dl.x + nx * 11, dl.y + ny * 11);
+    g.fillStyle(YELLOW, 1);
+    g.fillCircle(dl.x + nx * 11, dl.y + ny * 11, 4);
+    g.fillStyle(0x4a525a, 1);
+    g.fillCircle(dl.x, dl.y, 7);
+    g.fillStyle(YELLOW, 1);
+    g.fillCircle(dl.x, dl.y, 3.2);
+  }
   for (const m of MARKS) {
     if (damage < m.level) continue;
     const grow = Math.min(1, (damage - m.level) / 14 + 0.45);
@@ -166,4 +208,5 @@ export function drawBoat(g: Phaser.GameObjects.Graphics, view: View, s: GameStat
       g.lineBetween(pts[1]![0], pts[1]![1], pts[2]![0], pts[2]![1]);
     }
   }
+  return dols;
 }
