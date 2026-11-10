@@ -77,6 +77,11 @@ export class FriendsUI {
     this.toastEl.dataset.testid = 'toast';
     document.body.append(this.root, this.banner, this.toastEl);
     social.on((e) => this.onEvent(e));
+    screens.overlayClosers.push(() => {
+      const was = !this.root.classList.contains('hidden');
+      if (was) this.close();
+      return was;
+    });
     screens.onFriends = () => this.showFriends();
     screens.friendsCount = () => this.badgeCount();
     document.addEventListener('visibilitychange', () => {
@@ -228,7 +233,7 @@ export class FriendsUI {
     this.mount(card);
   }
 
-  showOnboarding(opts: { invite?: string | null; after: () => void }): void {
+  showOnboarding(opts: { invite?: string | null; after: () => void; onSkip?: () => void }): void {
     this.open = true;
     this.errBox = null;
     this.scene.paused = true;
@@ -275,7 +280,7 @@ export class FriendsUI {
     const skip = btn('Skip for now', 'onb-skip', () => {
       skipIdentity();
       this.close();
-      opts.after();
+      (opts.onSkip ?? opts.after)();
     }, 'link');
     card.append(name, go, have, codeRow, err, skip, this.privacyLink());
     this.mount(card);
@@ -321,7 +326,7 @@ export class FriendsUI {
 
   showFriends(): void {
     if (!loadIdentity()) {
-      this.showOnboarding({ after: () => this.showFriends() });
+      this.showOnboarding({ after: () => this.showFriends(), onSkip: () => this.screens.showMenu() });
       return;
     }
     this.open = true;

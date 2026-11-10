@@ -549,19 +549,4 @@ export function mountAudioButtons(): void {
   window.addEventListener('pageshow', back);
   window.addEventListener('focus', back);
 
-  const hint = document.createElement('button');
-  hint.type = 'button';
-  hint.id = 'sound-hint';
-  hint.textContent = '🔈 Tap for sound';
-  hint.addEventListener('click', (e) => {
-    e.stopPropagation();
-    sfx.unlock();
-  });
-  document.body.appendChild(hint);
-  const syncHint = (): void => {
-    hint.style.display = !sfx.running && (sfx.sfxOn || sfx.musicOn) ? 'block' : 'none';
-  };
-  sfx.onChange(syncHint);
-  window.setInterval(syncHint, 700);
-  syncHint();
 }

@@ -21,8 +21,14 @@ export class Screens {
   private readonly result = el('div');
   private readonly menuBtn = el('button', '', '☰');
   /** Online play takes over the menu button (leave dialog instead of the local menu). */
+  private view: 'home' | 'panel' | 'levels' | null = null;
   menuHook: (() => boolean) | null = null;
-  onTogether: (() => void) | null = null;
+  /** Other full screens (friends, settings) register here so the corner icons can close them. */
+  readonly overlayClosers: Array<() => boolean> = [];
+  onPlay: (() => void) | null = null;
+  onFriend: (() => void) | null = null;
+  onSettings: (() => void) | null = null;
+  onPrivacy: (() => void) | null = null;
   onFriends: (() => void) | null = null;
   friendsCount: () => number = () => 0;
 
@@ -40,13 +46,21 @@ export class Screens {
       sfx.unlock();
       sfx.click();
       if (this.menuHook?.()) return;
-      this.showMenu();
+      const open = this.overlayClosers.some((f) => f());
+      if (open) return this.showPanel();
+      if (!this.menu.classList.contains('hidden') && this.view === 'panel') {
+        if (this.scene.state.tick > 0 && !this.scene.state.gameOver && !this.scene.state.finished) this.hideAll();
+        else this.showMenu();
+        return;
+      }
+      this.showPanel();
     });
     document.body.append(this.menu, this.result, this.menuBtn);
     scene.onEnd = (kind) => this.showResult(kind);
   }
 
   hideAll(): void {
+    this.view = null;
     this.menu.classList.add('hidden');
     this.result.classList.add('hidden');
     this.scene.paused = false;
@@ -66,13 +80,14 @@ export class Screens {
   }
 
   showMenu(levels = false): void {
+    this.view = levels ? 'levels' : 'home';
     keepScreenOn();
     const p = loadProgress();
     this.scene.paused = true;
     this.result.classList.add('hidden');
     this.menu.replaceChildren();
     const card = el('div', 'card');
-    const running = this.scene.state.tick > 30 && !this.scene.state.gameOver && !this.scene.state.finished;
+    const running = this.scene.state.tick > 0 && !this.scene.state.gameOver && !this.scene.state.finished;
     if (levels) {
       card.append(el('h2', '', 'Levels'));
       const row = el('div', 'levels');
@@ -92,74 +107,90 @@ export class Screens {
       back.dataset.testid = 'levels-back';
       back.addEventListener('click', () => {
         sfx.click();
-        this.showMenu();
+        this.showPanel();
       });
       card.append(back);
       this.menu.append(card);
       this.menu.classList.remove('hidden');
       return;
     }
-    card.append(el('h2', '', 'Dum & Dee'));
-    const cont = this.continueDef();
+    card.append(el('h1', 'title', 'Dum & Dee'));
     const started = !!p.levels[CAMPAIGN[0]!.id] || Object.keys(p.levels).length > 0;
-    const play = el('button', 'primary big', started ? 'Continue' : 'Play');
+    const cont = this.continueDef();
+    const play = el('button', 'primary huge', started ? 'Continue' : 'Play');
     play.dataset.testid = 'btn-play';
-    play.append(el('small', '', started ? cont.name : CAMPAIGN[0]!.name));
+    if (started) play.append(el('small', '', cont.name));
     play.addEventListener('click', () => {
-      sfx.click();
-      this.start(started ? cont : CAMPAIGN[0]!);
-    });
-    const endless = levelById('endless');
-    const er = p.endless[endless.id];
-    const inf = el('button', 'big', '∞ Endless');
-    inf.dataset.testid = 'btn-endless';
-    inf.append(el('small', '', er ? `Best ${er.bestDistance} m` : 'Factory and studio'));
-    inf.addEventListener('click', () => {
-      sfx.click();
-      this.start(endless);
-    });
-    const together = el('button', 'big', '👥 Play together');
-    together.dataset.testid = 'btn-together';
-    together.append(el('small', '', 'Two phones, one ladder'));
-    together.addEventListener('click', () => {
       sfx.unlock();
       sfx.click();
-      this.menu.classList.add('hidden');
-      this.onTogether?.();
+      if (this.onPlay) this.onPlay();
+      else this.start(started ? cont : CAMPAIGN[0]!);
     });
-    const friends = el('button', 'big', '🤝 Friends');
-    friends.dataset.testid = 'btn-friends';
-    friends.append(el('small', '', 'Codes, teams, play with a friend'));
+    const friend = el('button', 'big', 'Play with a friend');
+    friend.dataset.testid = 'btn-friend';
     const badge = el('span', 'badge hidden');
     badge.dataset.testid = 'friends-badge';
     const fc = this.friendsCount();
     badge.textContent = String(fc);
     badge.classList.toggle('hidden', fc === 0);
-    friends.append(badge);
-    friends.addEventListener('click', () => {
+    friend.append(badge);
+    friend.addEventListener('click', () => {
       sfx.unlock();
       sfx.click();
       this.menu.classList.add('hidden');
+      this.onFriend?.();
+    });
+    card.append(play, friend);
+    this.menu.append(card);
+    this.menu.classList.remove('hidden');
+  }
+
+  /** True while a menu, result or other full screen is open. */
+  hasPausedUI(): boolean {
+    return !this.menu.classList.contains('hidden') || !this.result.classList.contains('hidden');
+  }
+
+  /** After closing a sub screen: back to the ☰ menu. */
+  showPanelOrResume(): void {
+    this.showPanel();
+  }
+
+  /** The ☰ menu: everything that is not "Play" or "Play with a friend". */
+  showPanel(): void {
+    this.view = 'panel';
+    keepScreenOn();
+    this.scene.paused = true;
+    this.result.classList.add('hidden');
+    const card = el('div', 'card narrow');
+    card.append(el('h2', '', 'Menu'));
+    const running = this.scene.state.tick > 0 && !this.scene.state.gameOver && !this.scene.state.finished;
+    const add = (label: string, id: string, fn: () => void, cls = ''): void => {
+      const b = el('button', cls, label);
+      b.dataset.testid = id;
+      b.addEventListener('click', () => {
+        sfx.unlock();
+        sfx.click();
+        fn();
+      });
+      card.append(b);
+    };
+    if (running) add('Resume', 'panel-resume', () => this.hideAll(), 'primary');
+    add('∞ Endless', 'btn-endless', () => this.start(levelById('endless')));
+    add('Levels', 'btn-levels', () => this.showMenu(true));
+    add('Friends', 'btn-friends', () => {
+      this.menu.classList.add('hidden');
       this.onFriends?.();
     });
-    card.append(play, inf, together, friends);
-    if (running) {
-      const resume = el('button', 'plain', 'Resume');
-      resume.dataset.testid = 'menu-resume';
-      resume.addEventListener('click', () => {
-        sfx.click();
-        this.hideAll();
-      });
-      card.append(resume);
-    }
-    const lv = el('button', 'link', 'Levels');
-    lv.dataset.testid = 'btn-levels';
-    lv.addEventListener('click', () => {
-      sfx.click();
-      this.showMenu(true);
+    add('Settings', 'panel-settings', () => {
+      this.menu.classList.add('hidden');
+      this.onSettings?.();
     });
-    card.append(lv);
-    this.menu.append(card);
+    add('Privacy', 'panel-privacy', () => {
+      this.menu.classList.add('hidden');
+      this.onPrivacy?.();
+    });
+    add('Home', 'panel-home', () => this.showMenu(), 'plain');
+    this.menu.replaceChildren(card);
     this.menu.classList.remove('hidden');
   }
 

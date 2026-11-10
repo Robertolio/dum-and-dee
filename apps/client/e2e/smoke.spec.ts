@@ -98,11 +98,11 @@ test.describe('Dum & Dee — one-screen prototype (mobile landscape)', () => {
 
   test('digital mode from the debug panel: hold = upright, release = bent', async ({ page }) => {
     await openGame(page);
-    await page.locator('#debug-toggle').click();
-    await expect(page.locator('#debug')).toBeVisible();
-    await page.getByTestId('mode-digital').click();
+    await page.getByTestId('settings-button').click();
+    await page.getByTestId('set-digital').click();
     expect(await page.evaluate(() => window.__dd.getSettings().posture)).toBe('digital');
-    await page.locator('#debug-toggle').click();
+    await page.getByTestId('settings-done').click();
+    await page.getByTestId('panel-resume').click();
 
     // Nobody touching → both bent.
     await page.waitForTimeout(700);

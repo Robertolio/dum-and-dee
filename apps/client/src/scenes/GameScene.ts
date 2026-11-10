@@ -31,7 +31,8 @@ import { STRINGS } from '../strings';
 import { sfx } from '../audio/sfx';
 import { Speech } from '../render/speech';
 import { ReplayRecorder } from '../debug/replay';
-import { isTouchDevice } from '../platform/fullscreen';
+import { initialControls } from '../platform/controls';
+import { Coach } from '../ui/coach';
 
 const FONT = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 
@@ -39,6 +40,7 @@ export class GameScene extends Phaser.Scene {
   state!: GameState;
   levelDef: LevelDef = levelById('endless');
   paused = false;
+  readonly coach = new Coach();
   onEnd: ((kind: 'gameover' | 'complete') => void) | null = null;
   private hintsShown = new Set<number>();
   /** Online play: prediction layer instead of the local sim loop. */
@@ -231,7 +233,7 @@ export class GameScene extends Phaser.Scene {
 
     // Controls.
     this.controller = new Controller(this.game.canvas);
-    this.controller.setSettings({ source: isTouchDevice() ? 'touch' : 'keyboard' });
+    this.controller.setSettings(initialControls());
     this.updateInputScale();
     this.scale.on('resize', () => this.onResize());
 
@@ -324,17 +326,10 @@ export class GameScene extends Phaser.Scene {
     Object.assign(this.tuning, cloneTuning(DEFAULT_TUNING));
   }
 
+  /** Controls are explained by the coach during play; no static text on the playfield. */
   refreshHints(): void {
-    const cfg = this.controller.settings();
-    const W = this.scale.width;
-    if (cfg.source === 'keyboard') {
-      this.hintText.setText(STRINGS.keyboardHint);
-      for (const l of this.zoneLabels) l.setText('');
-    } else {
-      this.hintText.setText(cfg.posture === 'analog' ? `${STRINGS.analog}: drag ↓ to bend, ↑ to stretch, → to run` : `${STRINGS.digital}: ${STRINGS.touchHintDigital}`);
-      this.zoneLabels[0]!.setText(`${STRINGS.dum} — ${STRINGS.hold}`).setPosition(W * 0.25, GAME_H - 44).setColor('#9bb9ff');
-      this.zoneLabels[1]!.setText(`${STRINGS.dee} — ${STRINGS.hold}`).setPosition(W * 0.75, GAME_H - 44).setColor('#ff9f96');
-    }
+    this.hintText.setText('');
+    for (const l of this.zoneLabels) l.setText('');
   }
 
   private updateInputScale(): void {
@@ -373,10 +368,12 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(0.1, deltaMs / 1000);
     this.lastDt = dt;
     if (this.paused) {
+      this.coach.hide();
       this.render();
       return;
     }
     if (this.online) {
+      this.coach.hide();
       this.updateOnline(dt);
       return;
     }
@@ -410,6 +407,7 @@ export class GameScene extends Phaser.Scene {
 
     this.announce();
     this.showHints();
+    this.coach.update(dt, this.lastInputs, this.controller.settings());
     this.render();
   }
 

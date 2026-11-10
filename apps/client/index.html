@@ -54,91 +54,18 @@
         justify-content: center;
         text-align: center;
         background: #0d2b30;
-        z-index: 20;
+        z-index: 1000;
         font-size: 20px;
         padding: 24px;
       }
       @media (orientation: portrait) and (max-width: 900px) {
         #rotate {
           display: flex;
+          z-index: 1000;
         }
-      }
-      #start {
-        position: fixed;
-        inset: 0;
-        z-index: 15;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: radial-gradient(ellipse at center, #1b5560 0%, #0d2b30 75%);
-        padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
-          max(16px, env(safe-area-inset-left));
-        box-sizing: border-box;
-      }
-      #start.hidden {
-        display: none;
-      }
-      #start .card {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        text-align: center;
-        max-width: 640px;
-      }
-      #start h1 {
-        margin: 0;
-        font-size: 30px;
-        letter-spacing: 0.02em;
-      }
-      #start .mode {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 700;
-        color: #ffd36b;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-      }
-      #start .thumbs {
-        display: flex;
-        gap: 14px;
-        font-size: 14px;
-      }
-      #start .thumbs span {
-        padding: 6px 12px;
-        border-radius: 999px;
-        font-weight: 700;
-      }
-      #start .dum {
-        background: #2f6fd0;
-      }
-      #start .dee {
-        background: #d03a3a;
-      }
-      #start .help {
-        margin: 0;
-        font-size: 14px;
-        line-height: 1.35;
-        color: #cfe9ec;
-      }
-      #start .seg {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-        font-size: 13px;
-      }
-      #start .seg button {
-        background: #1d4d55;
-        color: #fff;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        border-radius: 8px;
-        padding: 6px 14px;
-        font-size: 14px;
-      }
-      #start .seg button.active {
-        background: #e0a92a;
-        color: #1b1b1b;
-        font-weight: 700;
+        body > *:not(#rotate):not(script) {
+          visibility: hidden !important;
+        }
       }
       .screen {
         position: fixed;
@@ -307,6 +234,12 @@
       .invite-banner button { background: #1d4d55; color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; min-height: 40px; padding: 4px 14px; font-size: 15px; }
       .invite-banner button.primary { background: #3fb768; color: #0b2411; font-weight: 800; }
       .toast { position: fixed; bottom: max(14px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 70; background: rgba(0,0,0,0.8); color: #fff; padding: 8px 14px; border-radius: 12px; font: 14px system-ui, sans-serif; max-width: 90vw; text-align: center; }
+      .screen h1.title { margin: 0 0 14px; font-size: 40px; letter-spacing: 0.02em; color: #ffd36b; text-shadow: 0 3px 0 #000; }
+      .screen button.huge { display: block; margin: 8px auto; min-width: min(320px, 80vw); padding: 16px 28px; font-size: 30px; font-weight: 900; border-radius: 18px; }
+      .screen button.huge small { display: block; font-size: 13px; font-weight: 500; opacity: 0.8; }
+      .screen .card button.big { display: block; margin: 8px auto; min-width: min(320px, 80vw); }
+      .coach { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 35; pointer-events: none; max-width: min(560px, 86vw); background: rgba(10, 30, 34, 0.88); color: #fff; border: 2px solid #ffd36b; border-radius: 14px; padding: 8px 16px; font: 700 16px system-ui, sans-serif; text-align: center; }
+      .coach.hidden { display: none; }
       .screen .buttons {
         display: flex;
         gap: 10px;
@@ -317,7 +250,7 @@
         position: fixed;
         left: max(8px, env(safe-area-inset-left));
         bottom: max(8px, env(safe-area-inset-bottom));
-        z-index: 31;
+        z-index: 46;
         width: 34px;
         height: 34px;
         border-radius: 17px;
@@ -375,23 +308,6 @@
         0%, 20% { transform: rotate(0deg); }
         60%, 100% { transform: rotate(-90deg); }
       }
-      #start-btn {
-        background: #3fb768;
-        color: #0b2411;
-        border: 0;
-        border-radius: 14px;
-        font-size: 24px;
-        font-weight: 800;
-        padding: 10px 56px;
-        min-height: 52px;
-        touch-action: manipulation;
-      }
-      #start .hint {
-        margin: 0;
-        font-size: 12px;
-        color: #9fd9df;
-        line-height: 1.3;
-      }
       #audio-buttons {
         position: fixed;
         right: calc(max(8px, env(safe-area-inset-right)) + 42px);
@@ -399,22 +315,6 @@
         z-index: 45;
         display: flex;
         gap: 6px;
-      }
-      #sound-hint {
-        position: fixed;
-        left: 50%;
-        bottom: max(48px, calc(env(safe-area-inset-bottom) + 40px));
-        transform: translateX(-50%);
-        z-index: 32;
-        padding: 8px 16px;
-        border-radius: 18px;
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        background: rgba(0, 0, 0, 0.6);
-        color: #fff;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        display: none;
       }
       #audio-buttons button {
         width: 34px;
@@ -436,7 +336,7 @@
         position: fixed;
         right: max(8px, env(safe-area-inset-right));
         bottom: max(8px, env(safe-area-inset-bottom));
-        z-index: 30;
+        z-index: 46;
         width: 34px;
         height: 34px;
         border-radius: 17px;
@@ -527,22 +427,6 @@
   </head>
   <body>
     <div id="game"></div>
-    <div id="start" data-testid="start-screen">
-      <div class="card">
-        <h1>Dum &amp; Dee</h1>
-        <p class="mode">Solo (two fingers)</p>
-        <div class="thumbs"><span class="dum">Left thumb = Dum</span><span class="dee">Right thumb = Dee</span></div>
-        <p class="help">Left thumb = Dum, right thumb = Dee. Drag up to stand, down to bend, push right to walk.</p>
-        <p class="help" data-testid="start-jump-help"><b>Jump</b> over crates, pallets and the banana peel: flick your thumb up quickly (or tap). Keyboard: Space (Dum), Enter (Dee). Duck on the stairs!</p>
-        <div class="seg" role="group" aria-label="Posture control">
-          <span>Control:</span>
-          <button type="button" data-testid="start-analog" class="active">Analog</button>
-          <button type="button" data-testid="start-digital">Digital</button>
-        </div>
-        <button id="start-btn" type="button" data-testid="start-button">Start</button>
-        <p class="hint" id="start-hint"></p>
-      </div>
-    </div>
     <div id="inset-probe"></div>
     <div id="rotate"><div><span class="phone"></span>Rotate your phone to landscape to play Dum &amp; Dee.</div></div>
     <button id="debug-toggle" type="button" aria-label="Debug panel" title="Debug panel">&#9881;</button>

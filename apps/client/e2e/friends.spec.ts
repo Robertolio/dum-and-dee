@@ -15,35 +15,32 @@ async function fresh(browser: import('@playwright/test').Browser, url = '/', ext
 }
 
 async function register(page: Page, name: string): Promise<void> {
-  await page.getByTestId('start-button').click();
+  await page.getByTestId('btn-friend').click();
   await page.getByTestId('onb-name').fill(name);
   await page.getByTestId('onb-create').click();
-  await expect(page.getByTestId('menu-screen')).toBeVisible();
+  await expect(page.getByTestId('friends-my-code')).toBeVisible();
 }
 
 test.describe('Identity and friends', () => {
   test('name filter, skip, and identity survives a reload', async ({ browser }) => {
     const { ctx, page } = await fresh(browser);
-    await page.getByTestId('start-button').click();
+    await page.getByTestId('btn-friend').click();
     await page.getByTestId('onb-name').fill('fuck');
     await page.getByTestId('onb-create').click();
     await expect(page.getByTestId('onb-error')).toContainText('friendlier');
     await page.getByTestId('onb-name').fill('Rob');
     await page.getByTestId('onb-create').click();
-    await expect(page.getByTestId('menu-screen')).toBeVisible();
-    await page.getByTestId('btn-friends').click();
+    await expect(page.getByTestId('friends-screen')).toBeVisible();
     await expect(page.getByTestId('friends-my-code')).toHaveText(/^ROB-[2-9A-Z]{3}$/);
     const code = (await page.getByTestId('friends-my-code').textContent())!;
     await page.reload();
     await page.waitForFunction(() => (window as any).__dd !== undefined);
-    await page.getByTestId('start-button').click();
-    await expect(page.getByTestId('menu-screen')).toBeVisible();
-    await page.getByTestId('btn-friends').click();
+    await page.getByTestId('btn-friend').click();
     await expect(page.getByTestId('friends-my-code')).toHaveText(code);
     await ctx.close();
 
     const s = await fresh(browser);
-    await s.page.getByTestId('start-button').click();
+    await s.page.getByTestId('btn-friend').click();
     await s.page.getByTestId('onb-skip').click();
     await expect(s.page.getByTestId('menu-screen')).toBeVisible();
     await s.ctx.close();
@@ -57,14 +54,12 @@ test.describe('Identity and friends', () => {
     const b = B.page;
 
     await register(a, 'Rob');
-    await a.getByTestId('btn-friends').click();
     const codeA = (await a.getByTestId('friends-my-code').textContent())!;
     expect(codeA).toMatch(/^ROB-[2-9A-Z]{3}$/);
     const href = (await a.getByTestId('friends-wa').getAttribute('href'))!;
     expect(decodeURIComponent(href.split('text=')[1]!)).toBe(`Play Dum & Dee with me: ${new URL(a.url()).origin}/?invite=${codeA} — my code is ${codeA}`);
 
     await register(b, 'Mia');
-    await b.getByTestId('btn-friends').click();
     await b.getByTestId('friends-add-input').fill(codeA.toLowerCase());
     await b.getByTestId('friends-add-go').click();
     await expect(b.getByTestId('outgoing-Rob')).toBeVisible();
@@ -106,7 +101,6 @@ test.describe('Identity and friends', () => {
     const B = await fresh(browser);
     await register(A.page, 'Ann');
     await register(B.page, 'Ben');
-    await B.page.getByTestId('btn-friends').click();
     await B.page.getByTestId('friends-add-input').fill('ZZZ-222');
     await B.page.getByTestId('friends-add-go').click();
     await expect(B.page.getByTestId('friends-error')).toContainText('No player with that code');
@@ -117,7 +111,6 @@ test.describe('Identity and friends', () => {
   test('delete me wipes the identity from the device and returns to the menu', async ({ browser }) => {
     const A = await fresh(browser);
     await register(A.page, 'Dora');
-    await A.page.getByTestId('btn-friends').click();
     await A.page.getByTestId('friends-settings').click();
     await A.page.getByTestId('set-delete').click();
     await A.page.getByTestId('set-delete-yes').click();
@@ -130,7 +123,7 @@ test.describe('Identity and friends', () => {
 test.describe('Invite landing', () => {
   test('iPhone Safari, new player: explains Add to Home Screen and the code', async ({ browser }) => {
     const { ctx, page } = await fresh(browser, '/?invite=ROB-7K2', { userAgent: IPHONE_UA });
-    await page.getByTestId('start-button').click();
+    await page.getByTestId('btn-play').click();
     await expect(page.getByTestId('invite-ios-new')).toContainText('Add to Home Screen');
     await expect(page.getByTestId('invite-ios-new')).toContainText('ROB-7K2');
     await page.getByTestId('invite-ios-have').click();
@@ -140,7 +133,7 @@ test.describe('Invite landing', () => {
 
   test('desktop/Android with ?invite: first start prefills the invite code', async ({ browser }) => {
     const { ctx, page } = await fresh(browser, '/?invite=ROB-7K2');
-    await page.getByTestId('start-button').click();
+    await page.getByTestId('btn-play').click();
     await expect(page.getByTestId('onb-invite')).toHaveValue('ROB-7K2');
     await ctx.close();
   });

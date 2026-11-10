@@ -25,7 +25,7 @@ test.describe('Phone finish', () => {
     });
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__dd !== undefined);
-    await page.getByTestId('start-button').click();
+    await page.getByTestId('btn-play').click();
     await expect.poll(() => page.evaluate(() => (window as any).__wl)).toBeGreaterThan(0);
   });
 

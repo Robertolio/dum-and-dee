@@ -1,0 +1,98 @@
+import type { GameScene } from '../scenes/GameScene';
+import type { Screens } from './screens';
+import { saveControls } from '../platform/controls';
+import { sfx } from '../audio/sfx';
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text) e.textContent = text;
+  return e;
+}
+
+/** Settings behind the gear: control override (automatic by default), privacy, developer tools. */
+export class SettingsUI {
+  private readonly root = el('div', 'screen hidden');
+  private back: (() => void) | null = null;
+
+  constructor(private readonly scene: GameScene, private readonly screens: Screens, private readonly showPrivacy: () => void) {
+    this.root.id = 'settings';
+    this.root.dataset.testid = 'settings-screen';
+    document.body.append(this.root);
+    screens.overlayClosers.push(() => {
+      const was = !this.root.classList.contains('hidden');
+      this.root.classList.add('hidden');
+      return was;
+    });
+    screens.onSettings = () => this.show();
+    screens.onPrivacy = () => this.showPrivacy();
+    const gear = document.getElementById('debug-toggle');
+    gear?.setAttribute('aria-label', 'Settings');
+    gear?.setAttribute('data-testid', 'settings-button');
+    gear?.addEventListener('click', () => {
+      sfx.unlock();
+      sfx.click();
+      if (!this.root.classList.contains('hidden')) this.close();
+      else this.show();
+    });
+  }
+
+  private close(): void {
+    this.root.classList.add('hidden');
+    if (this.screens.hasPausedUI()) return;
+    this.screens.showPanelOrResume();
+  }
+
+  show(): void {
+    this.scene.paused = true;
+    const card = el('div', 'card narrow');
+    card.append(el('h2', '', 'Settings'));
+    const cfg = this.scene.controller.settings();
+    const mk = (label: string, id: string, active: boolean, fn: () => void): HTMLButtonElement => {
+      const b = el('button', active ? 'active' : '', label);
+      b.dataset.testid = id;
+      b.addEventListener('click', () => {
+        sfx.click();
+        fn();
+        this.show();
+      });
+      return b;
+    };
+    card.append(el('h3', '', 'Controls'), el('p', 'sub', 'Chosen automatically for this device. Change it only if it does not fit.'));
+    const row = el('div', 'ctl');
+    row.append(
+      mk('Touch (thumbs)', 'set-touch', cfg.source === 'touch', () => this.apply({ source: 'touch' })),
+      mk('Keyboard', 'set-keyboard', cfg.source === 'keyboard', () => this.apply({ source: 'keyboard' })),
+    );
+    card.append(row);
+    if (cfg.source === 'touch') {
+      const r2 = el('div', 'ctl');
+      r2.append(
+        mk('Analog', 'set-analog', cfg.posture === 'analog', () => this.apply({ posture: 'analog' })),
+        mk('Digital', 'set-digital', cfg.posture === 'digital', () => this.apply({ posture: 'digital' })),
+      );
+      card.append(r2);
+    }
+    const dev = el('button', 'link', 'Developer tools');
+    dev.dataset.testid = 'settings-dev';
+    dev.addEventListener('click', () => {
+      document.getElementById('debug')?.classList.toggle('open');
+      this.root.classList.add('hidden');
+    });
+    const done = el('button', 'primary', 'Done');
+    done.dataset.testid = 'settings-done';
+    done.addEventListener('click', () => {
+      sfx.click();
+      this.close();
+    });
+    card.append(dev, done);
+    this.root.replaceChildren(card);
+    this.root.classList.remove('hidden');
+  }
+
+  private apply(c: { source?: 'touch' | 'keyboard'; posture?: 'analog' | 'digital' }): void {
+    this.scene.controller.setSettings(c);
+    saveControls(c);
+    this.scene.refreshHints();
+  }
+}

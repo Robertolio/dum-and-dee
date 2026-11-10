@@ -9,7 +9,7 @@ async function open(ctx: BrowserContext, url: string): Promise<Page> {
   page.on('pageerror', (e) => console.log('PAGEERROR', String(e)));
   await page.goto(url);
   await page.waitForFunction(() => (window as any).__dd !== undefined);
-  await page.getByTestId('start-button').click();
+  if (url.includes('room=')) await page.getByTestId('btn-play').click();
   return page;
 }
 
@@ -20,8 +20,7 @@ test.describe('Online: two devices in one room', () => {
     const ctxB = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
 
     const a = await open(ctxA, '/');
-    await expect(a.getByTestId('btn-together')).toBeVisible();
-    await a.getByTestId('btn-together').click();
+    await a.evaluate(() => (window as any).__online.showEntry());
     await a.getByTestId('online-new').click();
     const codeEl = a.getByTestId('lobby-code');
     await expect(codeEl).toHaveText(/^[A-Z2-9]{6}$/);

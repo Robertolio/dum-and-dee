@@ -35,7 +35,7 @@ export default defineConfig({
     {
       // Production server (static files + /ws) for the online tests; needs `pnpm build` first.
       command: 'node ../../scripts/serve.mjs',
-      env: { PORT: '4600', DD_SINGLE_PORT: '1', SQLITE_FILE: ':memory:' },
+      env: { PORT: '4600', DD_SINGLE_PORT: '1', SQLITE_FILE: ':memory:', REGISTRATIONS_PER_HOUR_PER_IP: '1000', CODE_ATTEMPTS_PER_MINUTE: '1000' },
       url: 'http://localhost:4600/robots.txt',
       reuseExistingServer: true,
       timeout: 60_000,

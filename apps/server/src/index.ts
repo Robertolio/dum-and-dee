@@ -33,7 +33,7 @@ export async function attachOnline(servers: Server[]): Promise<Online> {
   const health = { db: 'none' as string, vapid: false };
   try {
     const db = await openStore(process.env);
-    const social = new Social(db, { now: () => Date.now(), randomBytes: (n) => randomBytes(n) });
+    const social = new Social(db, { now: () => Date.now(), randomBytes: (n) => randomBytes(n), registrationsPerHourPerIp: Number(process.env.REGISTRATIONS_PER_HOUR_PER_IP) || 8, codeAttemptsPerMinute: Number(process.env.CODE_ATTEMPTS_PER_MINUTE) || 10 });
     hub = new Hub(mgr, social, createPushSender({ ...process.env, ...(await resolveVapid(db, process.env)) }), { now: () => Date.now() });
     const h = hub;
     health.db = db.kind === 'pg' ? 'postgres' : db.kind;

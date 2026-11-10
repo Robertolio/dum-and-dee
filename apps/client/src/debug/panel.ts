@@ -36,7 +36,6 @@ export function mountDebugPanel(scene: GameScene): void {
   const toggle = document.getElementById('debug-toggle');
   if (!root || !toggle) return;
 
-  toggle.addEventListener('click', () => root.classList.toggle('open'));
 
   root.innerHTML = '';
   const h = (tag: string, attrs: Record<string, string> = {}, text = ''): HTMLElement => {

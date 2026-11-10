@@ -6,7 +6,7 @@ test.describe('Menu, level select, game over and level complete', () => {
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__dd !== undefined);
-    await page.getByTestId('start-button').click();
+    await page.getByTestId('menu-button').click();
     await page.getByTestId('btn-levels').click();
     await expect(page.getByTestId('level-s1')).toBeVisible();
     await page.getByTestId('level-s1').click();
@@ -16,13 +16,15 @@ test.describe('Menu, level select, game over and level complete', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Start opens the level select; choosing a level starts it; stars are remembered', async ({ page }) => {
+  test('Play starts the first level; the menu icon holds Endless, Levels, Friends, Settings, Privacy; stars are remembered', async ({ page }) => {
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__dd !== undefined);
-    await page.getByTestId('start-button').click();
     await expect(page.getByTestId('menu-screen')).toBeVisible();
     await expect(page.getByTestId('btn-play')).toContainText('Play');
-    await expect(page.getByTestId('btn-endless')).toBeVisible();
+    await expect(page.getByTestId('btn-endless')).toHaveCount(0);
+    await page.getByTestId('menu-button').click();
+    for (const id of ['btn-endless', 'btn-levels', 'btn-friends', 'panel-settings', 'panel-privacy']) await expect(page.getByTestId(id), id).toBeVisible();
+    await expect(page.getByTestId('panel-resume')).toHaveCount(0);
     await expect(page.getByTestId('level-f0')).toHaveCount(0);
     await page.getByTestId('btn-levels').click();
     await expect(page.getByTestId('level-f0')).toBeVisible();
@@ -31,6 +33,10 @@ test.describe('Menu, level select, game over and level complete', () => {
     const id = await page.evaluate(() => (window as any).__dd.getState().levelLength);
     expect(id).toBeGreaterThan(100);
     await page.waitForFunction(() => (window as any).__dd.getState().tick > 20);
+    await page.getByTestId('menu-button').click();
+    await expect(page.getByTestId('panel-resume')).toBeVisible();
+    await page.getByTestId('panel-resume').click();
+    await expect(page.getByTestId('menu-screen')).toBeHidden();
   });
 
   test('Continue resumes the campaign at the first unfinished level; Endless starts the mixed run', async ({ page }) => {
@@ -38,9 +44,9 @@ test.describe('Menu, level select, game over and level complete', () => {
     await page.evaluate(() => localStorage.setItem('dd-progress', JSON.stringify({ levels: { f0: { stars: 3, best: 9 }, f1: { stars: 2, best: 9 } }, endless: {} })));
     await page.reload();
     await page.waitForFunction(() => (window as any).__dd !== undefined);
-    await page.getByTestId('start-button').click();
     await expect(page.getByTestId('btn-play')).toContainText('Continue');
     await expect(page.getByTestId('btn-play')).toContainText('Butcher aisle');
+    await page.getByTestId('menu-button').click();
     await page.getByTestId('btn-endless').click();
     await page.waitForFunction(() => (window as any).__dd.getState().tick > 20);
     expect(await page.evaluate(() => (window as any).__dd.getState().mixed)).toBe(true);
