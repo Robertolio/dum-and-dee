@@ -55,9 +55,9 @@ export function integrateBucket(s: GameState, t: Tuning): void {
     t.kPhi * Math.max(0, phiDeg - t.phiSafeDeg) +
     t.kV * Math.max(0, Math.abs(aPyF) - t.aSafe) +
     t.kJ * Math.max(0, jerk - t.jSafe);
-  B.lossRate = rate;
+  B.lossRate = s.theme === 'boathouse' ? 0 : rate;
   B.splash = Math.max(Math.abs(aPyF), B.splash * (1 - dt * 2));
-  if (rate > 0) loseWater(s, rate * dt);
+  if (rate > 0 && s.theme !== 'boathouse') loseWater(s, rate * dt);
 }
 
 export function loseWater(s: GameState, amount: number): void {

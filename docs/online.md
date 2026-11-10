@@ -191,3 +191,6 @@ Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per h
 - Friends: 'Invite a friend' with your one code, **Share via WhatsApp** (link carries only the code) and **Copy** (link + code as one text; system Share where available); 'Your friends' with Play with <name> and a more menu (Remove, Block); at the bottom a collapsed 'Have a friend's code?' (the field accepts a pasted invite text too). Back and Settings stay.
 - Settings: Your name (Rename with inline error or 'Name changed.'; the stored identity name is updated too), Controls (Touch/Keyboard, Analog/Digital, same as the gear), Delete me, Back. 'Renew my code' (the server message `renew` still exists) and the notifications button are gone.
 - Notifications are always on, without a button: permission and push subscription are requested once per session at a deliberate tap (adding a friend by code, accepting a request, 'Play with'), never at startup. Unsupported browsers (iOS outside the home-screen app) and denied permission are skipped silently; friends who are away then get the WhatsApp nudge on the waiting screen.
+
+### Boathouse level
+`b1` (theme `boathouse`) is a normal level id, so online rooms can use it; the hull is `bucket.water` in the shared sim state and the visuals are client-only.

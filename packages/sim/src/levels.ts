@@ -1,12 +1,12 @@
 import { DEFAULT_TUNING } from './tuning';
 import type { LevelData } from './level';
 import { createGen, emitKind, ENDLESS_LEVEL, type LevelHint } from './level';
-import type { BeamObstacle, LampState, SoftObstacle, StepObstacle } from './state';
+import type { Theme, BeamObstacle, LampState, SoftObstacle, StepObstacle } from './state';
 
 export interface LevelDef {
   id: string;
   name: string;
-  theme: 'factory' | 'studio';
+  theme: Theme;
   endless: boolean;
   data: LevelData;
   blurb: string;
@@ -15,7 +15,7 @@ export interface LevelDef {
 type Item = [kind: number, d: number, hint?: string];
 
 /** Compose a scripted level from fixed pattern kinds (seeded content, fixed order and spacing). */
-function compose(id: string, theme: 'factory' | 'studio', seed: number, items: Item[], _par: number, gap = 7.5): LevelData {
+function compose(id: string, theme: Theme, seed: number, items: Item[], _par: number, gap = 7.5): LevelData {
   const t = DEFAULT_TUNING;
   const g = createGen({ id, lamps: [], steps: [], length: 0, generator: { seed, startX: 14 }, theme }, 0, 0)!;
   const s = { steps: [] as StepObstacle[], lamps: [] as LampState[], beams: [] as BeamObstacle[], softs: [] as SoftObstacle[] };
@@ -99,8 +99,24 @@ const endless: LevelDef = {
   data: { id: 'endless', length: 1e9, lamps: [], steps: [], theme: 'factory', mixed: true, generator: { seed: 20241029, startX: 16 } },
 };
 
-/** The campaign, in play order: factory levels, then the TV studio. */
-export const CAMPAIGN: LevelDef[] = [...factory, ...studio];
+/**
+ * Boathouse: the ladder is a skiff, the bucket's water is the hull (damage from every knock, none from swinging).
+ * Kinds are the generator's pattern numbers (0 prop, 1 lamp, 2 hanging oars, 3 steps, 4 prop + oar, 5 prop row,
+ * 6 pennants, 7 hanging vests, 8 puddle trail, 9 lamp pair, 11 prop + vest/pennant).
+ */
+const boathouse: LevelDef[] = [
+  { id: 'b1', name: 'Boathouse', blurb: 'Carry the skiff to the water', seed: 131, gap: 9, items: [[0, 0.2, 'Now entering: the boathouse. Carry the skiff gently'], [7, 0.2, 'Sweep the hanging vests away'], [1, 0.25], [8, 0.3, 'Puddles make you slip!'], [2, 0.35, 'Hanging oars swing: time it'], [3, 0.4, 'Steps ahead: duck under the beam'], [5, 0.45], [6, 0.45], [4, 0.5], [9, 0.5], [2, 0.55], [3, 0.6], [11, 0.6], [8, 0.65], [5, 0.7], [2, 0.7], [4, 0.75], [3, 0.8, 'Almost at the water!'], [0, 0.8]] },
+].map((l) => ({
+  id: l.id,
+  name: l.name,
+  theme: 'boathouse' as const,
+  endless: false,
+  blurb: l.blurb,
+  data: compose(l.id, 'boathouse', l.seed, l.items as Item[], 0, l.gap),
+}));
+
+/** The campaign, in play order: factory levels, the TV studio, then the boathouse. */
+export const CAMPAIGN: LevelDef[] = [...factory, ...studio, ...boathouse];
 export const LEVELS: LevelDef[] = [...CAMPAIGN, endless];
 
 export function nextLevel(id: string): LevelDef | undefined {

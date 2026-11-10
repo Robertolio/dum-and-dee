@@ -65,7 +65,7 @@ test.describe('Dum & Dee — one-screen prototype (mobile landscape)', () => {
       { x: 200, y: 300, id: 1 },
       { x: 640, y: 300, id: 2 },
     ]);
-    await page.waitForTimeout(1500);
+    await expect.poll(() => page.evaluate(() => window.__dd.getState().players[0]!.x), { timeout: 8000 }).toBeGreaterThan(x0 + 1);
     const mid = await page.evaluate(() => {
       const s = window.__dd.getState();
       return { x: s.players[0]!.x, inputs: window.__dd.lastInputs(), theta: s.ladder.theta };
@@ -80,7 +80,7 @@ test.describe('Dum & Dee — one-screen prototype (mobile landscape)', () => {
       { x: 200, y: 300, id: 1 },
       { x: 640, y: 380, id: 2 },
     ]);
-    await page.waitForTimeout(700);
+    await expect.poll(() => page.evaluate(() => window.__dd.getState().ladder.theta), { timeout: 8000 }).toBeLessThan(-0.12);
     const bent = await page.evaluate(() => {
       const s = window.__dd.getState();
       return { hB: s.players[1]!.h, theta: s.ladder.theta, hTarget: window.__dd.lastInputs()[1]!.hTarget };
@@ -89,9 +89,8 @@ test.describe('Dum & Dee — one-screen prototype (mobile landscape)', () => {
     expect(bent.hB).toBeLessThan(0.45);
     expect(bent.theta).toBeLessThan(-0.12);
     await touch(page, 'touchEnd', []);
-    await page.waitForTimeout(600);
-    const released = await page.evaluate(() => window.__dd.getState().players[1]!.h);
-    expect(released).toBeGreaterThan(0.7); // analog: release springs back upright
+    // analog: release springs back upright
+    await expect.poll(() => page.evaluate(() => window.__dd.getState().players[1]!.h), { timeout: 8000 }).toBeGreaterThan(0.7);
   });
 
   test('digital mode from the debug panel: hold = upright, release = bent', async ({ page }) => {

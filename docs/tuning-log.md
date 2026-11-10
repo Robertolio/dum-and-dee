@@ -118,3 +118,12 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 
 ## Round: simplified intro and play-together (phase 5)
 - Principle: zero choices before the first moment of play, explanation only during play. Start screen removed, two-button home, coach-marks in level 1, automatic controls per device, lobby/room code/QR removed from the UI. See `docs/online.md`.
+
+## Round: boathouse (level b1)
+- New theme `boathouse` (last in the campaign, after the TV studio; button in ☰ and in Levels, `?level=b1`, also online since the server only needs the level id). The ladder is drawn as a skiff (white hull, blue stripe with a thin yellow line), the bucket is gone: `bucket.water` is the hull integrity (HUD shows a hull bar, result says Hull). Swinging no longer costs anything (`lossRate` 0); every knock still does (slip, beam, wall, bonk, lamp), so the same tuning applies. Hull 0 = a life lost = skiff wrecked, back to the checkpoint with a new skiff; 0 lives = game over, exactly as before.
+- Damage is visual only and deterministic from the hull value: scratches from 4% damage, cracks from 22%, holes from 41%, missing chunks from 62%.
+- Props (new step kinds): ergometer, roller trestle, worn slide seat (the jump-over before hanging oars), life vest, coxswain cushion, boat trailer, sponge, rope, hose, puddle. Rope, hose and puddle trip or slip like cables and bananas (`isTripKind`). Hanging oars (`oar`, swing like the meat), hanging vests and pennants (sweepable, same score as webs), stairs with a beam as in the factory. Level `b1` is a composed pattern list with rising difficulty (0.2 to 0.8).
+- Club colours (RV Naarden, from its house rules and tenue page): cornflower blue RAL 5015, gold yellow RAL 1003, chalk white RAL 9003; oar blades are white with a blue/yellow/blue band. Used here as #2a6ebb, #f2a900, #f4f4ee.
+- Sounds (WebAudio, procedural): `hullCrack` (replaces the splash sound in the boathouse), `hullBreak` (hull gone), `waterIn` (end).
+- End: from 9 we before the end the floor runs down into the water; reaching the end splashes, then the result screen after 2.4 s.
+- Not tuned: balance of b1 (length, hull damage per knock) and its online feel.

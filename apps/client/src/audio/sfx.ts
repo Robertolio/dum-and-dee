@@ -292,8 +292,12 @@ class Sfx {
    * Cartoon water: bright "bloop" bubbles (sine, fast rising pitch), drip plinks and a short airy high-passed
    * sploosh. No low rumble. Everything randomised; more water lost = more bubbles and a bit louder.
    */
+  /** True in the boathouse: knocks crack the hull instead of splashing water. */
+  boat = false;
+
   splash(amount: number): void {
     if (!this.ready()) return;
+    if (this.boat) return this.hullCrack(amount);
     const a = Math.min(1, amount / 14);
     const r = Math.random;
     this.shaped('highpass', 1800 + r() * 1500, 0.7, 0.07 + a * 0.1 + r() * 0.05, 0.03 + a * 0.08, 0.006, 0);
@@ -301,6 +305,37 @@ class Sfx {
     for (let i = 0; i < bubbles; i++) this.bloop(0.01 + r() * (0.12 + a * 0.25), 0.07 + a * 0.1 + r() * 0.05);
     const drips = r() < 0.6 + a * 0.3 ? 1 + Math.floor(r() * 2) : 0;
     for (let i = 0; i < drips; i++) this.plink(0.1 + r() * 0.35, 0.04 + a * 0.04);
+  }
+
+  /** Wood and fibreglass cracking, plus a few splinters. */
+  hullCrack(amount: number): void {
+    if (!this.ready()) return;
+    const a = Math.min(1, amount / 14);
+    const r = Math.random;
+    this.shaped('bandpass', 1400 + r() * 900, 1.2, 0.05 + a * 0.05, 0.3 + a * 0.2, 0.001, 0, 3000);
+    this.tone('square', 240 + r() * 80, 90, 0.05 + a * 0.05, 0.16 + a * 0.12);
+    this.burst('lowpass', 700, 1, 0.07, 0.25);
+    const n = 2 + Math.floor(a * 4 + r() * 2);
+    for (let i = 0; i < n; i++) this.tone('triangle', 1800 + r() * 2600, 900, 0.025, 0.07, 0.03 + i * 0.04 + r() * 0.03);
+  }
+
+  /** The hull gives way: a long crack, a crunch and falling pieces. */
+  hullBreak(): void {
+    if (!this.ready()) return;
+    this.hullCrack(14);
+    this.tone('sawtooth', 140, 45, 0.5, 0.25, 0.04);
+    this.burst('lowpass', 500, 0.8, 0.3, 0.45);
+    for (let i = 0; i < 6; i++) this.tone('triangle', 900 + Math.random() * 1800, 500, 0.04, 0.09, 0.18 + i * 0.07);
+  }
+
+  /** Splash of the skiff entering the water. */
+  waterIn(): void {
+    if (!this.ready()) return;
+    const r = Math.random;
+    this.shaped('lowpass', 1200, 0.7, 0.5, 0.45, 0.01, 0);
+    this.shaped('highpass', 2200, 0.7, 0.35, 0.18, 0.01, 0.02);
+    for (let i = 0; i < 8; i++) this.bloop(0.05 + r() * 0.5, 0.1 + r() * 0.08);
+    this.tone('sine', 220, 120, 0.4, 0.2);
   }
 
   /** One bubble: short sine with a quickly rising pitch (~400-1200 Hz) and a tiny decay. */

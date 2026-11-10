@@ -76,8 +76,10 @@ export interface BucketState {
   splash: number;
 }
 
-export type LampKind = 'lamp' | 'meat' | 'boom';
-export type SoftKind = 'balloon' | 'web' | 'wheel' | 'fan' | 'weather' | 'onair' | 'applause' | 'buzzer' | 'wall';
+export type Theme = 'factory' | 'studio' | 'boathouse';
+
+export type LampKind = 'lamp' | 'meat' | 'boom' | 'oar';
+export type SoftKind = 'balloon' | 'web' | 'wheel' | 'fan' | 'weather' | 'onair' | 'applause' | 'buzzer' | 'wall' | 'pennant' | 'vest';
 
 export interface LampState {
   id: number;
@@ -97,7 +99,7 @@ export interface LampState {
   broken: boolean;
 }
 
-export type StepKind = 'bracket' | 'crate' | 'pallet' | 'banana' | 'duck' | 'pail' | 'tyre' | 'cheese' | 'knife' | 'speaker' | 'studioprop' | 'clothes' | 'film' | 'clapper' | 'director' | 'cart' | 'cable' | 'carpet' | 'dummy' | 'soundboard' | 'stair';
+export type StepKind = 'bracket' | 'crate' | 'pallet' | 'banana' | 'duck' | 'pail' | 'tyre' | 'cheese' | 'knife' | 'speaker' | 'studioprop' | 'clothes' | 'film' | 'clapper' | 'director' | 'cart' | 'cable' | 'carpet' | 'dummy' | 'soundboard' | 'stair' | 'ergo' | 'roller' | 'rollseat' | 'lifevest' | 'cushion' | 'trailer' | 'sponge' | 'rope' | 'hose' | 'puddle';
 
 export interface StepObstacle {
   id: number;
@@ -191,7 +193,7 @@ export interface GenState {
   last2: number;
   /** Extra/less spacing after the pattern just emitted (quiet stretches, busy combos). */
   gapScale: number;
-  theme: 'factory' | 'studio';
+  theme: Theme;
   mixed: boolean;
   /** Section captions (gates between themes, commercial breaks) with their x. */
   marks: { x: number; text: string }[];
@@ -230,7 +232,7 @@ export interface GameState {
   lives: number;
   distance: number;
   gameOver: boolean;
-  theme: 'factory' | 'studio';
+  theme: Theme;
   mixed: boolean;
   combo: number;
   comboMult: number;

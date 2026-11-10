@@ -115,10 +115,21 @@ export class Hud {
 
     // Water meter
     panel(g, W - 150, 70, 136, 34);
-    bucketIcon(g, W - 128, 87);
     const w = s.bucket.water;
-    g.fillStyle(w > 30 ? COLORS.water : COLORS.balanceRed);
-    drop(g, W - 100, 87, 8);
+    if (s.theme === 'boathouse') {
+      g.fillStyle(0xf4f4ee);
+      g.fillRoundedRect(W - 142, 83, 26, 9, 4);
+      g.fillStyle(0x2a6ebb);
+      g.fillRect(W - 138, 86, 18, 3);
+      g.fillStyle(w > 30 ? COLORS.balanceGreen : COLORS.balanceRed);
+      g.fillRoundedRect(W - 108, 82, Math.max(2, 54 * (w / 100)), 10, 3);
+      g.lineStyle(2, COLORS.hudBorder, 0.9);
+      g.strokeRoundedRect(W - 108, 82, 54, 10, 3);
+    } else {
+      bucketIcon(g, W - 128, 87);
+      g.fillStyle(w > 30 ? COLORS.water : COLORS.balanceRed);
+      drop(g, W - 100, 87, 8);
+    }
     this.waterText.setText(`${Math.round(w)}%`);
   }
 }

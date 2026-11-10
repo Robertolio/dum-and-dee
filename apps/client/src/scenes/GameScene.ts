@@ -9,6 +9,7 @@ import {
   MIXED_ZONE,
   nextLevel,
   themeAtX,
+  type Theme,
   type LevelDef,
   advanceWalk,
   createWalkAnim,
@@ -25,7 +26,7 @@ import { Controller } from '../input/controller';
 import { Hud } from '../render/hud';
 import { View } from '../render/view';
 import { DEE_STYLE, DUM_STYLE, drawFigure } from '../render/figures';
-import { drawLadder } from '../render/ladder';
+import { drawBoat, drawLadder } from '../render/ladder';
 import { drawThumb } from '../render/thumbs';
 import { STRINGS } from '../strings';
 import { sfx } from '../audio/sfx';
@@ -45,7 +46,7 @@ export class GameScene extends Phaser.Scene {
   private hintsShown = new Set<number>();
   /** Online play: prediction layer instead of the local sim loop. */
   online: ClientSync | null = null;
-  private curTheme: 'factory' | 'studio' = 'factory';
+  private curTheme: Theme = 'factory';
   private gateText: Phaser.GameObjects.Text | null = null;
   private bannerText: Phaser.GameObjects.Text | null = null;
   tuning: Tuning = cloneTuning(DEFAULT_TUNING);
@@ -82,6 +83,8 @@ export class GameScene extends Phaser.Scene {
   private bucketSprite!: Phaser.GameObjects.Image;
   private splash!: Phaser.GameObjects.Particles.ParticleEmitter;
   private sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private splinters!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private gWater!: Phaser.GameObjects.Graphics;
   private hintText!: Phaser.GameObjects.Text;
   private zoneLabels: Phaser.GameObjects.Text[] = [];
   private overlay: Phaser.GameObjects.Container | null = null;
@@ -147,6 +150,25 @@ export class GameScene extends Phaser.Scene {
       ['camera', 110, 150],
       ['cameraman', 110, 150],
     ];
+    art.push(
+      ['boathouse-wall', 512, 400],
+      ['boathouse-top', 512, 400],
+      ['boathouse-floor', 256, 100],
+      ['boathouse-ceiling', 256, 48],
+      ['ergo', 170, 45],
+      ['roller', 110, 35],
+      ['rollseat', 90, 26],
+      ['lifevest', 90, 18],
+      ['cushion', 70, 15],
+      ['trailer', 220, 60],
+      ['sponge', 60, 12],
+      ['rope', 130, 10],
+      ['hose', 180, 10],
+      ['puddle', 140, 6],
+      ['oar', 100, 120],
+      ['pennant', 100, 100],
+      ['vest', 100, 100],
+    );
     for (const [k, w, h] of art) this.load.svg(k, `art/${k}.svg`, { width: w, height: h });
     this.load.svg('lamp-cap', 'art/lamp-cap.svg', { width: 80, height: 60 });
     this.load.svg('bucket', 'art/bucket.svg', { width: 48, height: 52 });
@@ -212,6 +234,18 @@ export class GameScene extends Phaser.Scene {
       emitting: false,
     });
     this.sparks.setDepth(16);
+    this.splinters = this.add.particles(0, 0, 'dot', {
+      maxAliveParticles: 80,
+      speed: { min: 80, max: 260 },
+      angle: { min: 190, max: 350 },
+      gravityY: 700,
+      lifespan: { min: 400, max: 900 },
+      scale: { start: 0.9, end: 0.3 },
+      tint: [0xf4f4ee, 0xf4f4ee, 0xc9a27a, 0x2a6ebb],
+      emitting: false,
+    });
+    this.splinters.setDepth(16);
+    this.gWater = this.add.graphics().setDepth(10.95);
     this.confetti = this.add.particles(0, 0, 'dot', {
       maxAliveParticles: 160,
       speed: { min: 80, max: 300 },
@@ -652,8 +686,12 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'bucketEmpty':
           sfx.lifeLost();
+          if (this.curTheme === 'boathouse') {
+            sfx.hullBreak();
+            this.burst(this.splinters, 40, sx, sy);
+          }
           this.speech.say(null, 'Oh no!', 'urgent');
-          this.floatText(sx, sy - 60, STRINGS.newBucket, '#ffffff');
+          this.floatText(sx, sy - 60, this.curTheme === 'boathouse' ? 'The skiff is wrecked!' : STRINGS.newBucket, '#ffffff');
           this.shake = 0.3;
           break;
         case 'ladderSlipped':
@@ -670,7 +708,11 @@ export class GameScene extends Phaser.Scene {
         case 'levelDone':
           sfx.cheer();
           this.burst(this.confetti, 60, this.scale.width / 2, 120);
-          this.time.delayedCall(1200, () => !this.online && this.onEnd?.('complete'));
+          if (this.curTheme === 'boathouse') {
+            sfx.waterIn();
+            this.burst(this.splash, 50, this.view.sx(this.state.bucket.xP), FLOOR_Y - 40);
+          }
+          this.time.delayedCall(this.curTheme === 'boathouse' ? 2400 : 1200, () => !this.online && this.onEnd?.('complete'));
           break;
         case 'comboUp':
           sfx.pop();
@@ -693,7 +735,7 @@ export class GameScene extends Phaser.Scene {
         case 'respawn':
           this.resetWalk();
           this.view.camX = this.targetCamX();
-          this.floatText(this.scale.width / 2, 170, STRINGS.newBucket, '#ffffff');
+          this.floatText(this.scale.width / 2, 170, this.curTheme === 'boathouse' ? 'New skiff!' : STRINGS.newBucket, '#ffffff');
           break;
       }
     }
@@ -702,6 +744,10 @@ export class GameScene extends Phaser.Scene {
 
   private splashAt(n: number): void {
     const B = this.state.bucket;
+    if (this.curTheme === 'boathouse') {
+      this.burst(this.splinters, n, this.view.sx(B.xP), this.view.sy(B.yP) + 8);
+      return;
+    }
     const bx = this.view.sx(B.xP) + Math.sin(B.phi) * this.tuning.bucketL * PX;
     const by = this.view.sy(B.yP) + Math.cos(B.phi) * this.tuning.bucketL * PX;
     this.burst(this.splash, n, bx, by + 12);
@@ -982,9 +1028,9 @@ export class GameScene extends Phaser.Scene {
     this.banner(th === 'studio' ? 'Now entering: TV Studio' : 'Back to the Factory', '#ffd36b', 1800);
   }
 
-  private gates(): Array<{ x: number; to: 'factory' | 'studio' }> {
+  private gates(): Array<{ x: number; to: Theme }> {
     const d = this.levelDef.data;
-    const out: Array<{ x: number; to: 'factory' | 'studio' }> = [];
+    const out: Array<{ x: number; to: Theme }> = [];
     if (d.mixed) {
       const z0 = Math.max(1, Math.floor(this.view.camX / MIXED_ZONE));
       for (let z = z0; z <= z0 + 1; z++) out.push({ x: z * MIXED_ZONE, to: z % 2 === 1 ? 'studio' : 'factory' });
@@ -1001,8 +1047,7 @@ export class GameScene extends Phaser.Scene {
     for (const gate of this.gates()) {
       const sx = this.view.sx(gate.x);
       if (sx < -200 || sx > this.scale.width + 200) continue;
-      const studio = gate.to === 'studio';
-      const col = studio ? 0xb03a5c : 0xd8a62a;
+      const col = gate.to === 'studio' ? 0xb03a5c : gate.to === 'boathouse' ? 0x2a6ebb : 0xd8a62a;
       g.fillStyle(0x2b2f36);
       g.fillRect(sx - 90, FLOOR_Y - 250, 22, 250);
       g.fillRect(sx + 68, FLOOR_Y - 250, 22, 250);
@@ -1010,7 +1055,7 @@ export class GameScene extends Phaser.Scene {
       g.fillRect(sx - 100, FLOOR_Y - 290, 200, 46);
       g.fillStyle(0xffffff, 0.12);
       g.fillRect(sx - 68, FLOOR_Y - 244, 136, 244);
-      label = { sx, text: studio ? 'TV STUDIO' : 'FACTORY' };
+      label = { sx, text: gate.to === 'studio' ? 'TV STUDIO' : gate.to === 'boathouse' ? 'BOATHOUSE' : 'FACTORY' };
     }
     if (!this.gateText) this.gateText = this.add.text(0, 0, '', { fontFamily: 'sans-serif', fontSize: '24px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(7);
     this.gateText.setVisible(!!label);
@@ -1019,11 +1064,13 @@ export class GameScene extends Phaser.Scene {
 
   private applyTheme(clear = true): void {
     if (!this.layers) return;
-    const studio = this.curTheme === 'studio';
-    this.layers.wall.setTexture(studio ? 'studio-wall' : 'wall');
-    this.layers.pipes.setTexture(studio ? 'studio-top' : 'pipes');
-    this.layers.floor.setTexture(studio ? 'studio-floor' : 'floor');
-    this.layers.ceiling.setTexture(studio ? 'studio-ceiling' : 'ceiling');
+    const pre = this.curTheme === 'studio' ? 'studio-' : this.curTheme === 'boathouse' ? 'boathouse-' : '';
+    this.layers.wall.setTexture(pre ? `${pre}wall` : 'wall');
+    this.layers.pipes.setTexture(pre ? `${pre}top` : 'pipes');
+    this.layers.floor.setTexture(pre ? `${pre}floor` : 'floor');
+    this.layers.ceiling.setTexture(pre ? `${pre}ceiling` : 'ceiling');
+    sfx.boat = this.curTheme === 'boathouse';
+    this.bucketSprite?.setVisible(this.curTheme !== 'boathouse');
     if (!clear) return;
     for (const img of this.lampSprites.values()) img.destroy();
     this.lampSprites.clear();
@@ -1034,6 +1081,36 @@ export class GameScene extends Phaser.Scene {
     this.softAnim.clear();
     for (const img of this.decor.values()) img.destroy();
     this.decor.clear();
+  }
+
+  /** The slipway at the end of the boathouse: the floor runs down into the water. */
+  private drawWater(on: boolean): void {
+    const g = this.gWater;
+    g.clear();
+    if (!on) return;
+    const W = this.scale.width;
+    const x0 = this.view.sx(this.levelDef.data.length - 9);
+    if (x0 > W + 20) return;
+    const now = this.time.now / 1000;
+    const top = (x: number): number => {
+      const d = Math.min(1, Math.max(0, (x - x0) / (9 * PX)));
+      return FLOOR_Y - 6 - d * 74 + Math.sin(now * 2.4 + x * 0.03) * 2.5;
+    };
+    g.fillStyle(0x3b8fd4, 0.78);
+    g.beginPath();
+    g.moveTo(x0, GAME_H);
+    g.lineTo(x0, FLOOR_Y - 6);
+    for (let x = Math.max(x0, 0); x <= W + 20; x += 16) g.lineTo(x, top(x));
+    g.lineTo(W + 20, GAME_H);
+    g.closePath();
+    g.fillPath();
+    g.lineStyle(3, 0xffffff, 0.55);
+    g.beginPath();
+    g.moveTo(Math.max(x0, 0), top(Math.max(x0, 0)));
+    for (let x = Math.max(x0, 0); x <= W + 20; x += 16) g.lineTo(x, top(x));
+    g.strokePath();
+    g.fillStyle(0x6b4426, 1);
+    g.fillRect(x0 - 70, FLOOR_Y - 4, 70, 6);
   }
 
   private updateCameraLayers(): void {
@@ -1137,11 +1214,17 @@ export class GameScene extends Phaser.Scene {
       { x: headB.headX, y: headB.headY },
     ]);
     const bk = s.bucket;
-    sfx.setSlosh(s.gameOver || bk.water < 3 ? 0 : Math.min(1, Math.abs(bk.phiDot) * 0.28 + Math.abs(bk.phi) * 0.8 + bk.lossRate * 0.04));
+    sfx.setSlosh(this.curTheme === 'boathouse' || s.gameOver || bk.water < 3 ? 0 : Math.min(1, Math.abs(bk.phiDot) * 0.28 + Math.abs(bk.phi) * 0.8 + bk.lossRate * 0.04));
 
-    // Ladder.
-    drawLadder(g, view, s, t);
+    // Ladder (a skiff in the boathouse).
+    const boat = this.curTheme === 'boathouse';
+    if (boat) drawBoat(g, view, s, t);
+    else drawLadder(g, view, s, t);
+    this.drawWater(boat);
 
+
+    if (boat) this.gFx.clear();
+    else {
     // Bucket: hook at the middle, rope at angle phi, bucket hangs vertical at rest.
     const B = s.bucket;
     const hx = view.sx(B.xP);
@@ -1198,6 +1281,7 @@ export class GameScene extends Phaser.Scene {
       });
       fx.closePath();
       fx.fillPath();
+    }
     }
 
     // Thumb feedback.

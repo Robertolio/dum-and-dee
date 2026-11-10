@@ -3,6 +3,7 @@ import type { Tuning } from './tuning';
 import { approach, springStep } from './math';
 
 import { blocksPlayer, triggerSlip } from './obstacles';
+import { isTripKind } from './level';
 
 /** Floor obstacles the player can walk onto set the standing height; blocking ones and bananas do not. */
 export function updateStepTargets(s: GameState, t: Tuning): void {
@@ -20,7 +21,7 @@ export function updateStepTargets(s: GameState, t: Tuning): void {
         }
         continue;
       }
-      if (o.kind === 'banana' || o.kind === 'cable') {
+      if (isTripKind(o.kind)) {
         if (!o.used && Math.abs(p.x - (o.x0 + o.x1) / 2) < 0.3 && p.yFloor + p.jumpY < 0.12 && p.slipTimer <= 0) {
           o.used = true;
           triggerSlip(s, i as PlayerId, t);

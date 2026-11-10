@@ -96,7 +96,13 @@ export class Screens {
         sfx.click();
         this.start(levelById('s1'));
       });
-      card.append(tv);
+      const bh = el('button', 'primary', 'Boathouse');
+      bh.dataset.testid = 'btn-boathouse';
+      bh.addEventListener('click', () => {
+        sfx.click();
+        this.start(levelById('b1'));
+      });
+      card.append(tv, bh);
       const row = el('div', 'levels');
       for (const d of CAMPAIGN) {
         const b = el('button', 'level');
@@ -192,6 +198,7 @@ export class Screens {
     if (running) add('Resume', 'panel-resume', () => this.hideAll(), 'primary');
     add('∞ Endless', 'btn-endless', () => this.start(levelById('endless')));
     add('TV Studio', 'panel-tvstudio', () => this.start(levelById('s1')));
+    add('Boathouse', 'panel-boathouse', () => this.start(levelById('b1')));
     add('Levels', 'btn-levels', () => this.showMenu(true));
     add('Friends', 'btn-friends', () => {
       const v = this.view;
@@ -226,7 +233,7 @@ export class Screens {
       const r = s.result;
       card.append(
         el('p', 'big', `Score ${r.score}`),
-        el('p', '', `Water ${r.water}% (+${r.waterBonus}) · Lives (+${r.lifeBonus}) · Time ${r.time.toFixed(0)}s (+${r.timeBonus})`),
+        el('p', '', `${def.theme === 'boathouse' ? 'Hull' : 'Water'} ${r.water}% (+${r.waterBonus}) · Lives (+${r.lifeBonus}) · Time ${r.time.toFixed(0)}s (+${r.timeBonus})`),
         el('p', '', `Best combo ${r.bestCombo}`),
       );
     } else {
@@ -236,7 +243,7 @@ export class Screens {
     }
     const row = el('div', 'buttons');
     if (next) {
-      const nb = el('button', 'primary', next.theme !== def.theme ? `Next: ${next.name} (TV Studio)` : 'Next level');
+      const nb = el('button', 'primary', next.theme !== def.theme ? `Next: ${next.name} (${next.theme === 'boathouse' ? 'Boathouse' : 'TV Studio'})` : 'Next level');
       nb.dataset.testid = 'btn-next';
       nb.addEventListener('click', () => {
         sfx.click();

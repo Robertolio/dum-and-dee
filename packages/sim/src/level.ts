@@ -1,4 +1,4 @@
-import type { BeamObstacle, SoftKind, SoftObstacle, GenState, LampKind, LampState, StepObstacle, StepKind } from './state';
+import type { Theme, BeamObstacle, SoftKind, SoftObstacle, GenState, LampKind, LampState, StepObstacle, StepKind } from './state';
 import type { Tuning } from './tuning';
 
 export interface LevelLamp {
@@ -21,7 +21,7 @@ export interface LevelGenerator {
   startX: number;
 }
 export const MIXED_ZONE = 260;
-export function themeAtX(mixed: boolean, base: 'factory' | 'studio', x: number): 'factory' | 'studio' {
+export function themeAtX(mixed: boolean, base: Theme, x: number): Theme {
   if (!mixed) return base;
   return Math.floor(Math.max(0, x) / MIXED_ZONE) % 2 === 0 ? 'factory' : 'studio';
 }
@@ -39,7 +39,7 @@ export interface LevelData {
   hints?: { x: number; text: string }[];
   /** Par time (s) for the level-end time bonus. */
   par?: number;
-  theme?: 'factory' | 'studio';
+  theme?: Theme;
   /** Endless mixing: the theme alternates every MIXED_ZONE we. */
   mixed?: boolean;
   /** Endless procedural generation ahead of the ladder. */
@@ -68,6 +68,16 @@ export const STEP_HEIGHT: Record<StepKind, number> = {
   dummy: 0.55,
   soundboard: 0.45,
   stair: 0.2,
+  ergo: 0.45,
+  roller: 0.35,
+  rollseat: 0.26,
+  lifevest: 0.18,
+  cushion: 0.15,
+  trailer: 0.6,
+  sponge: 0.12,
+  rope: 0.1,
+  hose: 0.1,
+  puddle: 0.05,
 };
 
 /** Default footprint width (we) of each kind, used by the generator and the renderer. */
@@ -93,6 +103,16 @@ export const STEP_WIDTH: Record<StepKind, number> = {
   dummy: 0.7,
   soundboard: 1.2,
   stair: 0.7,
+  ergo: 1.7,
+  roller: 1.1,
+  rollseat: 0.9,
+  lifevest: 0.9,
+  cushion: 0.7,
+  trailer: 2.2,
+  sponge: 0.6,
+  rope: 1.3,
+  hose: 1.8,
+  puddle: 1.4,
 };
 
 /** Mass of pushable props: heavier ones slide less. */
@@ -118,6 +138,16 @@ export const STEP_MASS: Record<StepKind, number> = {
   dummy: 0.4,
   soundboard: 2,
   stair: 99,
+  ergo: 2.5,
+  roller: 1.5,
+  rollseat: 0.6,
+  lifevest: 0.3,
+  cushion: 0.3,
+  trailer: 3.5,
+  sponge: 0.2,
+  rope: 0.3,
+  hose: 0.3,
+  puddle: 0.3,
 };
 
 export function makeStep(id: number, x0: number, x1: number, hObj: number, kind: StepKind): StepObstacle {
@@ -126,9 +156,17 @@ export function makeStep(id: number, x0: number, x1: number, hObj: number, kind:
 
 const FACTORY_KINDS: StepKind[] = ['bracket', 'crate', 'pallet', 'banana', 'duck', 'pail', 'tyre', 'cheese'];
 const STUDIO_KINDS: StepKind[] = ['speaker', 'studioprop', 'clothes', 'film', 'clapper', 'director', 'cart', 'dummy', 'soundboard', 'cable', 'duck', 'pail'];
-const FLAT_KINDS: StepKind[] = ['banana', 'cable', 'carpet'];
-const meatKind = (g: GenState): LampKind => (g.theme === 'studio' ? 'boom' : 'meat');
-const floorKinds = (g: GenState): StepKind[] => (g.theme === 'studio' ? STUDIO_KINDS : FACTORY_KINDS);
+const FLAT_KINDS: StepKind[] = ['banana', 'cable', 'carpet', 'rope', 'hose', 'puddle'];
+const BOATHOUSE_KINDS: StepKind[] = ['ergo', 'roller', 'trailer', 'pail', 'lifevest', 'cushion', 'sponge', 'rollseat', 'rope', 'hose', 'puddle'];
+
+/** Flat floor things that trip or slip you instead of blocking: bananas, cables, ropes, hoses, puddles. */
+export const isTripKind = (k: StepKind): boolean => k === 'banana' || k === 'cable' || k === 'rope' || k === 'hose' || k === 'puddle';
+const meatKind = (g: GenState): LampKind => (g.theme === 'studio' ? 'boom' : g.theme === 'boathouse' ? 'oar' : 'meat');
+const floorKinds = (g: GenState): StepKind[] => (g.theme === 'studio' ? STUDIO_KINDS : g.theme === 'boathouse' ? BOATHOUSE_KINDS : FACTORY_KINDS);
+const knifeKind = (g: GenState): StepKind => (g.theme === 'studio' ? 'film' : g.theme === 'boathouse' ? 'rollseat' : 'knife');
+const slipKind = (g: GenState): StepKind => (g.theme === 'boathouse' ? 'puddle' : 'banana');
+const balloonKind = (g: GenState): 'balloon' | 'pennant' => (g.theme === 'boathouse' ? 'pennant' : 'balloon');
+const webKind = (g: GenState): 'web' | 'vest' => (g.theme === 'boathouse' ? 'vest' : 'web');
 
 /** Fixed test level (no generator). */
 export const PROTOTYPE_LEVEL: LevelData = {
@@ -237,7 +275,7 @@ function addStep(s: { steps: StepObstacle[] }, g: GenState, x: number, kind: Ste
 /** Cleaver(s) well before a hanging piece of meat: the front hand jumps, lands, and still has room to duck. */
 export const KNIFE_TO_MEAT = 3.4;
 function addKnives(s: { steps: StepObstacle[] }, g: GenState, meatX: number, minX: number): void {
-  const kind: StepKind = g.theme === 'studio' ? 'film' : 'knife';
+  const kind = knifeKind(g);
   const w = STEP_WIDTH[kind];
   const x0 = meatX - KNIFE_TO_MEAT - w;
   addStep(s, g, x0, kind);
@@ -261,7 +299,7 @@ function addMeatSeries(s: { lamps: LampState[]; steps: StepObstacle[] }, g: GenS
   const dphase = pick(g, [0, Math.PI, Math.PI / 2, 0.7, 1.6]);
   const phase0 = rand(g) * Math.PI * 2;
   const knives = rand(g) < 0.7;
-  const lead = knives ? KNIFE_TO_MEAT + STEP_WIDTH[g.theme === 'studio' ? 'film' : 'knife'] + (rand(g) < 0.3 ? STEP_WIDTH[g.theme === 'studio' ? 'film' : 'knife'] + 1.7 : 0) : 0;
+  const lead = knives ? KNIFE_TO_MEAT + STEP_WIDTH[knifeKind(g)] + (rand(g) < 0.3 ? STEP_WIDTH[knifeKind(g)] + 1.7 : 0) : 0;
   if (knives) addKnives(s, g, x + lead, x);
   for (let i = 0; i < n; i++) {
     const [psi, psiDot] = swingState(amp, phase0 + i * dphase, t.meatL, t);
@@ -296,7 +334,7 @@ function addBalloons(s: { softs: SoftObstacle[] }, g: GenState, x: number, d: nu
   const n = 2 + Math.floor(rand(g) * 3);
   let cx = x;
   for (let i = 0; i < n; i++) {
-    s.softs.push({ id: g.nextSoftId++, kind: 'balloon', x: cx, y: 1.7 + rand(g) * 1.0, r: 0.36 + rand(g) * 0.1, color: Math.floor(rand(g) * 6), done: false });
+    s.softs.push({ id: g.nextSoftId++, kind: balloonKind(g), x: cx, y: 1.7 + rand(g) * 1.0, r: 0.36 + rand(g) * 0.1, color: Math.floor(rand(g) * 6), done: false });
     cx += 1.1 + rand(g) * 0.9;
   }
   void d;
@@ -305,7 +343,7 @@ function addBalloons(s: { softs: SoftObstacle[] }, g: GenState, x: number, d: nu
 
 function addWebs(s: { softs: SoftObstacle[] }, g: GenState, x: number): number {
   const n = rand(g) < 0.35 ? 2 : 1;
-  for (let i = 0; i < n; i++) s.softs.push({ id: g.nextSoftId++, kind: 'web', x: x + i * 2.6, y: 1.55 + rand(g) * 0.5, r: 0.5 + rand(g) * 0.12, color: 0, done: false });
+  for (let i = 0; i < n; i++) s.softs.push({ id: g.nextSoftId++, kind: webKind(g), x: x + i * 2.6, y: 1.55 + rand(g) * 0.5, r: 0.5 + rand(g) * 0.12, color: 0, done: false });
   return (n - 1) * 2.6 + 1;
 }
 
@@ -326,7 +364,7 @@ function emitPattern(s: { steps: StepObstacle[]; lamps: LampState[]; beams: Beam
   // The first few patterns are gentle: single obstacles.
   if (g.patterns <= 2) {
     if (g.patterns === 1) addLamp(s, g, t, x, 'lamp');
-    else addStep(s, g, x, pick(g, ['crate', 'banana', 'duck', 'pail'] as const));
+    else addStep(s, g, x, pick(g, g.theme === 'boathouse' ? (['roller', 'puddle', 'pail', 'cushion'] as const) : (['crate', 'banana', 'duck', 'pail'] as const)));
     return 1;
   }
   void r;
@@ -395,7 +433,7 @@ export function emitKind(s: EmitTarget, g: GenState, t: Tuning, kind: number, x:
     case 8: {
       // Banana trail: slippery, with room to jump or sidestep in between.
       const n = 2 + (rand(g) < 0.4 ? 1 : 0);
-      for (let i = 0; i < n; i++) addStep(s, g, x + i * 3.4, 'banana');
+      for (let i = 0; i < n; i++) addStep(s, g, x + i * 3.4, slipKind(g));
       return (n - 1) * 3.4 + 1;
     }
     case 9: {
@@ -411,9 +449,9 @@ export function emitKind(s: EmitTarget, g: GenState, t: Tuning, kind: number, x:
     }
     case 11: {
       // Busy combo: a prop with a web or balloons right behind it.
-      addStep(s, g, x, pick(g, ['duck', 'pail', 'tyre', 'cheese', 'crate'] as const));
-      if (rand(g) < 0.5) s.softs.push({ id: g.nextSoftId++, kind: 'web', x: x + 3.4, y: 1.6, r: 0.55, color: 0, done: false });
-      else s.softs.push({ id: g.nextSoftId++, kind: 'balloon', x: x + 3.0, y: 1.9 + rand(g) * 0.6, r: 0.4, color: Math.floor(rand(g) * 6), done: false });
+      addStep(s, g, x, pick(g, g.theme === 'boathouse' ? (['pail', 'roller', 'ergo', 'rollseat'] as const) : (['duck', 'pail', 'tyre', 'cheese', 'crate'] as const)));
+      if (rand(g) < 0.5) s.softs.push({ id: g.nextSoftId++, kind: webKind(g), x: x + 3.4, y: 1.6, r: 0.55, color: 0, done: false });
+      else s.softs.push({ id: g.nextSoftId++, kind: balloonKind(g), x: x + 3.0, y: 1.9 + rand(g) * 0.6, r: 0.4, color: Math.floor(rand(g) * 6), done: false });
       g.gapScale = 0.85;
       return 4.2;
     }

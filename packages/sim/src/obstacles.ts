@@ -3,10 +3,11 @@ import type { Tuning } from './tuning';
 import { applyLadderImpulse, ladderSegment } from './ladder';
 import { loseWater } from './bucket';
 import { closestOnSegment } from './collision';
+import { isTripKind } from './level';
 
 /** True when the object is too high for this player to simply walk onto, and the player is on its approach side. */
 export function blocksPlayer(p: PlayerState, o: StepObstacle, t: Tuning): boolean {
-  if (o.kind === 'banana' || o.kind === 'cable' || o.kind === 'carpet') return false;
+  if (isTripKind(o.kind) || o.kind === 'carpet') return false;
   const feet = p.yFloorTarget + p.jumpY;
   if (o.hObj - feet <= t.autoStepMax) return false;
   // Only the approach side blocks; once the body is over the object it is free (landing on top).
@@ -42,7 +43,7 @@ export function resolveObstacles(s: GameState, t: Tuning): void {
   const dt = t.dt;
   const fh = t.footHalf;
   for (const o of s.steps) {
-    if (o.kind === 'stair' || o.kind === 'banana' || o.kind === 'cable' || o.kind === 'carpet') continue;
+    if (o.kind === 'stair' || isTripKind(o.kind) || o.kind === 'carpet') continue;
     if (o.vx !== 0) {
       const dx = o.vx * dt;
       o.x0 += dx;
@@ -123,6 +124,8 @@ export function integrateSofts(s: GameState, t: Tuning): void {
       applause: [t.scoreApplause, 'applause'],
       buzzer: [t.scoreBuzzer, 'buzz'],
       wall: [t.scoreWall, 'crash'],
+      pennant: [t.scoreWeb, 'sweep'],
+      vest: [t.scoreWeb, 'sweep'],
     } as const;
     const [pts, type] = table[o.kind];
     s.score += pts;
