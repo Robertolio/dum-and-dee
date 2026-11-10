@@ -2,8 +2,9 @@ import type { GameScene } from '../scenes/GameScene';
 import type { Screens } from './screens';
 import type { OnlineUI } from './online';
 import { SocialClient, type FriendView, type MeView, type SocialEvent } from '../net/social';
-import { inviteFromUrl, isIos, isStandalone, loadIdentity, skipIdentity, skippedIdentity } from '../social/identity';
+import { saveIdentity, parseInviteCode, inviteFromUrl, isIos, isStandalone, loadIdentity, skipIdentity, skippedIdentity } from '../social/identity';
 import { sfx } from '../audio/sfx';
+import { controlsSection } from './settings';
 import { pushSupport, enablePush, disablePush, pushEnabled } from '../social/push';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
@@ -47,9 +48,9 @@ const ERRORS: Record<string, string> = {
 };
 
 export const PRIVACY_TEXT = [
-  'What we store: your chosen name, a friend code, a secret token for this device (also kept on this device), your friends list, team names, and, only if you turn on notifications, a push address of your browser. No email, no phone number, no location, no analytics.',
+  'What we store: your chosen name, a friend code, a secret token for this device (also kept on this device), your friends list, and, only if you turn on notifications, a push address of your browser. No email, no phone number, no location, no analytics.',
   'Who sees what: only the friends you accept can see your name and whether you are online. There is no search and nobody sees friends of friends.',
-  'Wipe it: "Delete me" in Friends removes everything about you from the server and from this device at once. You can also renew your friend code at any time. Accounts unused for 6 months are deleted automatically.',
+  'Wipe it: "Delete me" in Friends removes everything about you from the server and from this device at once. Accounts unused for 6 months are deleted automatically.',
 ];
 
 /** Identity, friends, teams, invites: onboarding, the Friends screen, the invite banner and the ?invite= landing. */
@@ -98,6 +99,12 @@ export class FriendsUI {
   private onEvent(e: SocialEvent): void {
     switch (e.type) {
       case 'me':
+        if (this.renameTo && e.me.name === this.renameTo) {
+          const id = loadIdentity();
+          if (id) saveIdentity({ ...id, name: e.me.name });
+          if (this.renameOk?.isConnected) this.renameOk.textContent = 'Name changed.';
+          this.renameTo = '';
+        }
         this.updateBadge();
         this.renderBanner();
         if (this.open) {
@@ -131,7 +138,7 @@ export class FriendsUI {
   private badgeCount(): number {
     const me = this.social.me;
     if (!me) return 0;
-    return me.incoming.length + me.friends.filter((f) => f.team.pending?.by === 'them').length + me.invites.length;
+    return me.incoming.length + me.invites.length;
   }
 
   private updateBadge(): void {
@@ -337,54 +344,67 @@ export class FriendsUI {
     card.append(el('h2', '', 'Friends'));
     const me = this.social.me;
     const top = el('div', 'me-box');
-    const name = tid(el('b', '', me?.name ?? loadIdentity()?.name ?? ''), 'friends-me-name');
     const code = tid(el('div', 'code', me?.code ?? '…'), 'friends-my-code');
-    top.append(el('h3', '', 'Invite a friend'), el('small', '', 'Send the link. They open it, add the game to their home screen and enter your code:'), code, name);
+    const name = tid(el('small', '', me?.name ?? loadIdentity()?.name ?? ''), 'friends-me-name');
+    top.append(el('h3', '', 'Invite a friend'), code, name);
     const share = el('div', 'share');
-    const copy = btn('Copy code', 'friends-copy', () => {
-      const c = this.social.me?.code ?? '';
-      void navigator.clipboard?.writeText(c).then(() => (copy.textContent = 'Copied!'), () => (copy.textContent = c));
-    });
-    const wa = tid(el('a', 'btn wa', 'Invite via WhatsApp'), 'friends-wa');
+    const wa = tid(el('a', 'btn wa big', 'Share via WhatsApp'), 'friends-wa');
     wa.target = '_blank';
     wa.rel = 'noopener';
+    const copy = btn('Copy', 'friends-copy', () => {
+      void navigator.clipboard?.writeText(inviteText(this.social.me?.code ?? '')).then(() => {
+        copy.textContent = 'Copied';
+        window.setTimeout(() => (copy.textContent = 'Copy'), 1500);
+      }, () => undefined);
+    }, 'big');
     const setWa = (): void => {
       const c = this.social.me?.code ?? '';
       wa.href = `https://wa.me/?text=${encodeURIComponent(inviteText(c))}`;
       code.textContent = c || '…';
+      name.textContent = this.social.me?.name ?? name.textContent;
     };
     setWa();
     this.offMe?.();
     this.offMe = this.social.on((e) => e.type === 'me' && setWa());
-    share.append(copy, wa);
-    if (typeof navigator.share === 'function') share.append(btn('Share…', 'friends-share', () => void navigator.share({ title: 'Dum & Dee', text: inviteText(this.social.me?.code ?? '') }).catch(() => undefined)));
+    share.append(wa, copy);
+    if (typeof navigator.share === 'function') share.append(btn('Share…', 'friends-share', () => void navigator.share({ title: 'Dum & Dee', text: inviteText(this.social.me?.code ?? '') }).catch(() => undefined), 'big'));
     top.append(share);
     card.append(top);
 
-    const add = el('div', 'join-row');
+    this.lists = el('div', 'flist');
+    card.append(this.lists);
+    this.renderLists();
+
+    const add = el('div', 'join-row hidden');
     const input = tid(el('input', 'code-input'), 'friends-add-input');
-    input.placeholder = 'ROB-7K2';
-    input.maxLength = 8;
+    input.placeholder = 'Friend\u2019s code';
+    input.maxLength = 40;
     input.autocomplete = 'off';
     input.spellcheck = false;
     input.autocapitalize = 'characters';
     this.addInput = input;
-    const go = btn('Add friend', 'friends-add-go', () => {
-      const v = input.value.trim();
-      if (!v) return;
+    const go = btn('Add', 'friends-add-go', () => {
+      const code = parseInviteCode(input.value);
+      if (!code) {
+        this.showError('That is not a friend code.');
+        return;
+      }
       this.showError('');
-      this.social.send({ t: 'fr_add', code: v });
+      this.social.send({ t: 'fr_add', code });
       input.value = '';
-      this.toast('Request sent. Your friend has to accept it.');
-    });
+      add.classList.add('hidden');
+      this.toast('Request sent.');
+      void this.autoPush();
+    }, 'primary');
     input.addEventListener('keydown', (e) => e.key === 'Enter' && go.click());
     add.append(input, go);
     const err = tid(el('p', 'err'), 'friends-error');
     this.errBox = err;
-    this.lists = el('div', 'flist');
-    card.append(this.lists);
-    this.renderLists();
-    card.append(el('h3', '', "Got a friend's code?"), add, err);
+    const have = btn('Have a friend\u2019s code?', 'friends-have', () => {
+      add.classList.toggle('hidden');
+      if (!add.classList.contains('hidden')) input.focus();
+    }, 'link');
+    card.append(have, add, err);
 
     const foot = el('div', 'buttons wrap');
     foot.append(
@@ -415,12 +435,14 @@ export class FriendsUI {
       box.append(el('h3', '', 'Requests'));
       for (const r of me.incoming) {
         const row = tid(el('div', 'frow'), `request-${r.name}`);
-        row.append(el('b', '', r.name), el('span', 'grow'), btn('Accept', `accept-${r.name}`, () => this.social.send({ t: 'fr_yes', id: r.id }), 'primary'), btn('No', `decline-${r.name}`, () => this.social.send({ t: 'fr_no', id: r.id })), btn('Block', `blockreq-${r.name}`, () => this.social.send({ t: 'fr_block', id: r.id }), 'link'));
+        row.append(el('b', '', r.name), el('span', 'grow'), btn('Accept', `accept-${r.name}`, () => {
+          this.social.send({ t: 'fr_yes', id: r.id });
+          void this.autoPush();
+        }, 'primary'), btn('No', `decline-${r.name}`, () => this.social.send({ t: 'fr_no', id: r.id })), btn('Block', `blockreq-${r.name}`, () => this.social.send({ t: 'fr_block', id: r.id }), 'link'));
         box.append(row);
       }
     }
     box.append(el('h3', '', me.friends.length ? 'Your friends' : 'No friends yet'));
-    if (!me.friends.length) box.append(el('p', 'sub', 'Share your code, or enter your friend\'s code above.'));
     for (const f of me.friends) box.append(this.friendRow(f));
     if (me.outgoing.length) {
       box.append(el('h3', '', 'Waiting for them to accept'));
@@ -441,38 +463,21 @@ export class FriendsUI {
     const row = el('div', 'frow');
     const dot = tid(el('span', f.online ? 'dot on' : 'dot'), `online-${f.name}`);
     dot.title = f.online ? 'Online' : 'Offline';
-    row.append(dot, el('b', '', f.name), el('span', 'team', f.team.name), el('span', 'grow'));
+    row.append(dot, el('b', '', f.name), el('span', 'team', duoName(this.social.me?.name ?? '', f.name)), el('span', 'grow'));
     row.append(btn(`Play with ${f.name}`, `play-${f.name}`, () => {
+      void this.autoPush();
       this.close();
       this.online.playWith(f);
     }, 'primary'));
-    const more = btn('⋯', `more-${f.name}`, () => sub.classList.toggle('hidden'), 'x');
+    const more = btn('\u22ef', `more-${f.name}`, () => sub.classList.toggle('hidden'), 'x');
     row.append(more);
     wrap.append(row);
-    const t = f.team.pending;
-    if (t && t.by === 'them') {
-      const pr = tid(el('div', 'frow note'), `teamreq-${f.name}`);
-      pr.append(el('span', '', `${f.name} wants to call you "${t.name}"`), el('span', 'grow'), btn('OK', `team-yes-${f.name}`, () => this.social.send({ t: 'team_yes', id: f.id }), 'primary'), btn('No', `team-no-${f.name}`, () => this.social.send({ t: 'team_no', id: f.id })));
-      wrap.append(pr);
-    } else if (t) {
-      wrap.append(tid(el('div', 'frow note', `Waiting for ${f.name} to confirm "${t.name}"`), `teamwait-${f.name}`));
-    }
     const sub = el('div', 'frow subrow hidden');
-    const teamInput = tid(el('input', 'text-input small'), `team-input-${f.name}`);
-    teamInput.maxLength = 24;
-    teamInput.placeholder = 'Team name';
-    teamInput.value = f.team.custom ? f.team.name : '';
-    const setTeam = btn('Propose team name', `team-set-${f.name}`, () => {
-      this.showError('');
-      this.social.send({ t: 'team_set', id: f.id, name: teamInput.value });
-    });
-    sub.append(teamInput, setTeam);
     sub.append(btn('Remove', `remove-${f.name}`, () => {
       if (confirm(`Remove ${f.name} from your friends?`)) this.social.send({ t: 'fr_del', id: f.id });
     }, 'link'), btn('Block', `block-${f.name}`, () => {
       if (confirm(`Block ${f.name}? They are removed and cannot add you.`)) this.social.send({ t: 'fr_block', id: f.id });
     }, 'link'));
-    teamInput.addEventListener('blur', () => this.dirty && this.renderLists());
     wrap.append(sub);
     return wrap;
   }
@@ -485,24 +490,34 @@ export class FriendsUI {
     card.append(el('h2', '', 'Settings'));
     const name = tid(el('input', 'text-input'), 'set-name');
     name.maxLength = 16;
-    name.value = me?.name ?? '';
+    name.value = me?.name ?? loadIdentity()?.name ?? '';
     const err = tid(el('p', 'err'), 'set-error');
+    const ok = tid(el('p', 'ok'), 'set-ok');
     this.errBox = err;
-    const row = el('div', 'join-row');
-    row.append(name, btn('Rename', 'set-rename', () => {
+    const rename = (): void => {
       err.textContent = '';
-      this.social.send({ t: 'rename', name: name.value });
-    }));
-    card.append(el('h3', '', 'Your name'), row, err);
+      ok.textContent = '';
+      const v = name.value.trim();
+      if (v.length < 2 || v.length > 16) {
+        err.textContent = ERRORS.name_length!;
+        return;
+      }
+      if (v === this.social.me?.name) {
+        ok.textContent = 'Name saved.';
+        return;
+      }
+      this.renameTo = v;
+      this.renameOk = ok;
+      this.social.send({ t: 'rename', name: v });
+    };
+    const row = el('div', 'join-row');
+    row.append(name, btn('Rename', 'set-rename', rename, 'primary'));
+    name.addEventListener('keydown', (e) => e.key === 'Enter' && rename());
+    card.append(el('h3', '', 'Your name'), row, err, ok);
 
-    card.append(el('h3', '', 'Friend code'), el('p', 'sub', 'A new code makes the old one useless. Existing friends stay.'), btn('Renew my code', 'set-renew', () => {
-      this.social.send({ t: 'renew' });
-      this.toast('New code created.');
-    }));
+    card.append(el('h3', '', 'Controls'), controlsSection(this.scene, () => this.showSettings()));
 
-    card.append(el('h3', '', 'Notifications'), this.pushBox());
-
-    card.append(el('h3', '', 'Delete me'), el('p', 'sub', 'Removes your name, friends, teams and notification address from the server and this device.'));
+    card.append(el('h3', '', 'Delete me'), el('p', 'sub', 'Removes your name, friends and notification address from the server and this device.'));
     const del = btn('Delete me', 'set-delete', () => {
       const c = el('div', 'frow');
       c.append(el('span', 'sub', 'Really delete everything?'), btn('Yes, delete', 'set-delete-yes', () => this.social.send({ t: 'delete_me' }), 'danger'), btn('Cancel', 'set-delete-no', () => c.remove(), 'link'));
@@ -514,26 +529,21 @@ export class FriendsUI {
     this.root.replaceChildren(card);
   }
 
-  /** Push permission is asked here, on a deliberate tap, and also offered after the first friendship. */
-  pushBox(): HTMLElement {
-    const box = tid(el('div', 'pushbox'), 'push-box');
-    const render = async (): Promise<void> => {
-      const sup = pushSupport();
-      box.replaceChildren();
-      if (!sup.ok) {
-        box.append(tid(el('p', 'sub', sup.reason), 'push-unsupported'), el('p', 'sub', 'No problem: friends who are away get a WhatsApp nudge button instead.'));
-        return;
-      }
-      if (await pushEnabled()) {
-        box.append(el('p', 'sub', 'Notifications are on: you hear about invites even when the app is closed.'), btn('Turn off', 'push-off', () => void disablePush(this.social).then(render), 'link'));
-      } else {
-        box.append(el('p', 'sub', 'Get a notification when a friend is waiting for you.'), btn('Turn on notifications', 'push-on', () => void enablePush(this.social).then((r) => (r === 'ok' ? render() : this.showError(r === 'denied' ? 'Notifications are blocked in your browser settings.' : r === 'novapid' ? 'Notifications are not set up on the server yet.' : 'Could not turn on notifications.'))), 'primary'));
-      }
-    };
-    void render();
-    return box;
+  /** Notifications are always on: ask for permission and subscribe at a deliberate tap (adding/accepting a friend, Play with). Silent when unsupported or denied. */
+  private pushTried = false;
+  async autoPush(): Promise<void> {
+    if (this.pushTried || !pushSupport().ok) return;
+    this.pushTried = true;
+    try {
+      if (!(await pushEnabled())) await enablePush(this.social);
+    } catch {
+      /* unsupported or denied: stay quiet */
+    }
   }
+  private renameTo = '';
+  private renameOk: HTMLElement | null = null;
 }
 
+export const duoName = (a: string, b: string): string => `${a} & ${b}`;
 export const inviteText = (code: string): string => `Play Dum & Dee with me: ${location.origin}/?invite=${code} — my code is ${code}`;
 export type { MeView };

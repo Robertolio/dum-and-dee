@@ -30,10 +30,15 @@ export async function newPlayer(browser: Browser, name: string): Promise<{ ctx: 
 export async function twoFriends(browser: Browser, nameA = 'Rob', nameB = 'Mia') {
   const A = await newPlayer(browser, nameA);
   const B = await newPlayer(browser, nameB);
-  await B.page.getByTestId('friends-add-input').fill(A.code);
-  await B.page.getByTestId('friends-add-go').click();
+  await addByCode(B.page, A.code);
   await A.page.getByTestId(`accept-${nameB}`).click();
   await expect(A.page.getByTestId(`friend-${nameB}`)).toBeVisible();
   await expect(B.page.getByTestId(`friend-${nameA}`)).toBeVisible();
   return { A, B, nameA, nameB };
+}
+
+export async function addByCode(page: Page, code: string): Promise<void> {
+  if (!(await page.getByTestId('friends-add-input').isVisible())) await page.getByTestId('friends-have').click();
+  await page.getByTestId('friends-add-input').fill(code);
+  await page.getByTestId('friends-add-go').click();
 }

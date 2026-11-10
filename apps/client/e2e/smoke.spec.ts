@@ -54,9 +54,7 @@ test.describe('Dum & Dee — one-screen prototype (mobile landscape)', () => {
     expect(box).not.toBeNull();
     expect(box!.width).toBeGreaterThan(box!.height);
     const t1 = await page.evaluate(() => window.__dd.getState().tick);
-    await page.waitForTimeout(500);
-    const t2 = await page.evaluate(() => window.__dd.getState().tick);
-    expect(t2).toBeGreaterThan(t1 + 10);
+    await expect.poll(() => page.evaluate(() => window.__dd.getState().tick), { timeout: 5000 }).toBeGreaterThan(t1 + 10);
     await expect(page.locator('#rotate')).toBeHidden();
   });
 

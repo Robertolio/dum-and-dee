@@ -48,31 +48,8 @@ export class SettingsUI {
     const card = el('div', 'card narrow');
     card.append(el('h2', '', 'Settings'));
     const cfg = this.scene.controller.settings();
-    const mk = (label: string, id: string, active: boolean, fn: () => void): HTMLButtonElement => {
-      const b = el('button', active ? 'active' : '', label);
-      b.dataset.testid = id;
-      b.addEventListener('click', () => {
-        sfx.click();
-        fn();
-        this.show();
-      });
-      return b;
-    };
     card.append(el('h3', '', 'Controls'), el('p', 'sub', 'Chosen automatically for this device. Change it only if it does not fit.'));
-    const row = el('div', 'ctl');
-    row.append(
-      mk('Touch (thumbs)', 'set-touch', cfg.source === 'touch', () => this.apply({ source: 'touch' })),
-      mk('Keyboard', 'set-keyboard', cfg.source === 'keyboard', () => this.apply({ source: 'keyboard' })),
-    );
-    card.append(row);
-    if (cfg.source === 'touch') {
-      const r2 = el('div', 'ctl');
-      r2.append(
-        mk('Analog', 'set-analog', cfg.posture === 'analog', () => this.apply({ posture: 'analog' })),
-        mk('Digital', 'set-digital', cfg.posture === 'digital', () => this.apply({ posture: 'digital' })),
-      );
-      card.append(r2);
-    }
+    card.append(controlsSection(this.scene, () => this.show()));
     const dev = el('button', 'link', 'Developer tools');
     dev.dataset.testid = 'settings-dev';
     dev.addEventListener('click', () => {
@@ -90,9 +67,34 @@ export class SettingsUI {
     this.root.classList.remove('hidden');
   }
 
-  private apply(c: { source?: 'touch' | 'keyboard'; posture?: 'analog' | 'digital' }): void {
-    this.scene.controller.setSettings(c);
+}
+
+/** Touch/Keyboard and Analog/Digital buttons, shared by the gear settings and the Friends settings. */
+export function controlsSection(scene: GameScene, rerender: () => void): HTMLElement {
+  const box = el('div', 'ctls');
+  const cfg = scene.controller.settings();
+  const apply = (c: { source?: 'touch' | 'keyboard'; posture?: 'analog' | 'digital' }): void => {
+    scene.controller.setSettings(c);
     saveControls(c);
-    this.scene.refreshHints();
+    scene.refreshHints();
+  };
+  const mk = (label: string, id: string, active: boolean, c: { source?: 'touch' | 'keyboard'; posture?: 'analog' | 'digital' }): HTMLButtonElement => {
+    const b = el('button', active ? 'active' : '', label);
+    b.dataset.testid = id;
+    b.addEventListener('click', () => {
+      sfx.click();
+      apply(c);
+      rerender();
+    });
+    return b;
+  };
+  const row = el('div', 'ctl');
+  row.append(mk('Touch (thumbs)', 'set-touch', cfg.source === 'touch', { source: 'touch' }), mk('Keyboard', 'set-keyboard', cfg.source === 'keyboard', { source: 'keyboard' }));
+  box.append(row);
+  if (cfg.source === 'touch') {
+    const r2 = el('div', 'ctl');
+    r2.append(mk('Analog', 'set-analog', cfg.posture === 'analog', { posture: 'analog' }), mk('Digital', 'set-digital', cfg.posture === 'digital', { posture: 'digital' }));
+    box.append(r2);
   }
+  return box;
 }

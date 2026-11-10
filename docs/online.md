@@ -83,8 +83,8 @@ Built on top of the rooms above. Room codes and QR stay as the fallback (no acco
 ## Friends
 
 - Add by code sends a request; the other player must accept (mutual). Crossing requests auto-accept. There is no search by name and no friends-of-friends; a player only ever sees their own friends, requests and blocks.
-- Friends list shows name, online/offline dot and the team name. Remove ends the friendship for both. Block removes the friendship, hides future requests from the blocked player (they get no error) and can be undone under "Blocked".
-- Team name per pair: default `<A> & <B>`; one side proposes a name (max 24, same filter), the other must confirm, the old name stays until then. Stored per pair for a future leaderboard.
+- Friends list shows name, online/offline dot and the duo name. Remove ends the friendship for both. Block removes the friendship, hides future requests from the blocked player (they get no error) and can be undone under "Blocked".
+- Team names: the server logic (propose/confirm) still exists but the UI no longer uses it. The duo name is built on the client as `<my name> & <friend name>`.
 
 ## Playing together
 
@@ -164,7 +164,7 @@ Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per h
 ## Tests
 
 - Unit (`pnpm --filter @dd/social test`, 47 tests): codes, filter (incl. false-positive names), rate limiter, registration/token hashing, friendship flow (mutual accept, decline, crossing requests, remove, block/unblock, no friends-of-friends, rate limits), team-name confirmation, invites (friends only, expiry, dismiss), delete-me wipe, admin API over real HTTP, hub with fake sockets (live invite, push for offline, dead subscription cleanup, delete-me, room protocol unaffected), SQLite persistence across reopen, the same service on the Postgres adapter through `pg-mem`.
-- E2E (`e2e/friends.spec.ts`): A creates identity, B enters the code, A accepts, team name proposed and confirmed, A "Play with B", B sees the banner and joins the room; also name filter, identity surviving a reload, skip, delete-me, `?invite=` on iPhone UA and desktop.
+- E2E (`e2e/friends.spec.ts`): A creates identity, B enters the code, A accepts, A "Play with B", B sees the banner and joins the room; also name filter, identity surviving a reload, skip, delete-me, `?invite=` on iPhone UA and desktop.
 
 ## Not tested
 
@@ -186,3 +186,8 @@ Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per h
 - `?invite=` is parsed to the first code-shaped token (`ABC-XYZ`, case-insensitive; extra text after it is ignored). It opens the simple flow: name if needed, friend request, then banner/Join. `?room=CODE` joins through the same waiting/countdown screens. There is no lobby UI and no QR code any more (`qrcode-generator` removed).
 - WhatsApp text: `Play Dum & Dee with me: <origin>/?invite=CODE — my code is CODE`; the link only carries the code.
 - Testing: `?level=s1` (any campaign id) starts that level after Play; `?autostart&level=...` starts at once. The menu and the Levels list have a TV Studio button (starts s1). All levels are always open; progress is only written on completion.
+
+### Simplified Friends and Settings (phase 6)
+- Friends: 'Invite a friend' with your one code, **Share via WhatsApp** (link carries only the code) and **Copy** (link + code as one text; system Share where available); 'Your friends' with Play with <name> and a more menu (Remove, Block); at the bottom a collapsed 'Have a friend's code?' (the field accepts a pasted invite text too). Back and Settings stay.
+- Settings: Your name (Rename with inline error or 'Name changed.'; the stored identity name is updated too), Controls (Touch/Keyboard, Analog/Digital, same as the gear), Delete me, Back. 'Renew my code' (the server message `renew` still exists) and the notifications button are gone.
+- Notifications are always on, without a button: permission and push subscription are requested once per session at a deliberate tap (adding a friend by code, accepting a request, 'Play with'), never at startup. Unsupported browsers (iOS outside the home-screen app) and denied permission are skipped silently; friends who are away then get the WhatsApp nudge on the waiting screen.

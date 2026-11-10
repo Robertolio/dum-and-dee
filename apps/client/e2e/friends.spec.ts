@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { addByCode } from './helpers';
 
 test.use({ baseURL: process.env.E2E_BASE ?? 'http://localhost:4600' });
 
@@ -46,7 +47,7 @@ test.describe('Identity and friends', () => {
     await s.ctx.close();
   });
 
-  test('A creates identity, B enters the code, A accepts, team name, A plays with B, B joins from the invite', async ({ browser }) => {
+  test('A creates identity, B enters the code, A accepts, A plays with B, B joins from the invite', async ({ browser }) => {
     test.setTimeout(120_000);
     const A = await fresh(browser);
     const B = await fresh(browser);
@@ -60,8 +61,7 @@ test.describe('Identity and friends', () => {
     expect(decodeURIComponent(href.split('text=')[1]!)).toBe(`Play Dum & Dee with me: ${new URL(a.url()).origin}/?invite=${codeA} — my code is ${codeA}`);
 
     await register(b, 'Mia');
-    await b.getByTestId('friends-add-input').fill(codeA.toLowerCase());
-    await b.getByTestId('friends-add-go').click();
+    await addByCode(b, codeA.toLowerCase());
     await expect(b.getByTestId('outgoing-Rob')).toBeVisible();
 
     await expect(a.getByTestId('request-Mia')).toBeVisible();
@@ -72,14 +72,8 @@ test.describe('Identity and friends', () => {
     await expect(b.getByTestId('online-Rob')).toHaveClass(/on/);
     await expect(a.getByTestId('friend-Mia')).toContainText('Rob & Mia');
 
-    await a.getByTestId('more-Mia').click();
-    await a.getByTestId('team-input-Mia').fill('Ladder Pros');
-    await a.getByTestId('team-set-Mia').click();
-    await expect(b.getByTestId('teamreq-Rob')).toContainText('Ladder Pros');
-    await expect(a.getByTestId('teamwait-Mia')).toBeVisible();
-    await b.getByTestId('team-yes-Rob').click();
-    await expect(a.getByTestId('friend-Mia')).toContainText('Ladder Pros');
-    await expect(b.getByTestId('friend-Rob')).toContainText('Ladder Pros');
+    await expect(a.getByTestId('friends-screen')).not.toContainText(/team name/i);
+    await expect(a.getByTestId('set-renew')).toHaveCount(0);
 
     await a.getByTestId('play-Mia').click();
     await expect(a.getByTestId('wait-title')).toContainText('Waiting for Mia');
@@ -99,8 +93,7 @@ test.describe('Identity and friends', () => {
     const B = await fresh(browser);
     await register(A.page, 'Ann');
     await register(B.page, 'Ben');
-    await B.page.getByTestId('friends-add-input').fill('ZZZ-222');
-    await B.page.getByTestId('friends-add-go').click();
+    await addByCode(B.page, 'ZZZ-222');
     await expect(B.page.getByTestId('friends-error')).toContainText('No player with that code');
     await A.ctx.close();
     await B.ctx.close();
@@ -115,6 +108,45 @@ test.describe('Identity and friends', () => {
     await expect(A.page.getByTestId('menu-screen')).toBeVisible();
     expect(await A.page.evaluate(() => localStorage.getItem('dd-id'))).toBeNull();
     await A.ctx.close();
+  });
+});
+
+test.describe('Settings', () => {
+  test('rename works with feedback; no renew or notification button; controls present', async ({ browser }) => {
+    const A = await fresh(browser);
+    const B = await fresh(browser);
+    await register(A.page, 'Rob');
+    await register(B.page, 'Mia');
+    const code = (await A.page.getByTestId('friends-my-code').textContent())!;
+    await addByCode(B.page, code);
+    await A.page.getByTestId('accept-Mia').click();
+    await expect(B.page.getByTestId('friend-Rob')).toBeVisible();
+
+    await A.page.getByTestId('friends-settings').click();
+    await expect(A.page.getByTestId('set-renew')).toHaveCount(0);
+    await expect(A.page.getByTestId('push-on')).toHaveCount(0);
+    await expect(A.page.getByTestId('set-touch')).toBeVisible();
+    await expect(A.page.getByTestId('set-keyboard')).toBeVisible();
+
+    await A.page.getByTestId('set-name').fill('R');
+    await A.page.getByTestId('set-rename').click();
+    await expect(A.page.getByTestId('set-error')).toContainText('2 to 16');
+    await A.page.getByTestId('set-name').fill('Robert');
+    await A.page.getByTestId('set-rename').click();
+    await expect(A.page.getByTestId('set-ok')).toContainText('Name changed');
+    await expect(B.page.getByTestId('friend-Robert')).toBeVisible();
+    expect(await A.page.evaluate(() => JSON.parse(localStorage.getItem('dd-id') ?? '{}').name)).toBe('Robert');
+
+    await A.page.getByTestId('set-name').fill('Mia');
+    await A.page.getByTestId('set-rename').click();
+    await A.page.getByTestId('set-name').fill('shit');
+    await A.page.getByTestId('set-rename').click();
+    await expect(A.page.getByTestId('set-error')).not.toHaveText('');
+
+    await A.page.getByTestId('set-back').click();
+    await expect(A.page.getByTestId('friends-me-name')).toHaveText('Mia');
+    await A.ctx.close();
+    await B.ctx.close();
   });
 });
 
