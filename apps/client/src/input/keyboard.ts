@@ -31,6 +31,13 @@ export interface KeyboardSample {
 export class KeyboardInput {
   private readonly held = new Set<string>();
   private readonly hTargets = [DEFAULT_TUNING.hUpright, DEFAULT_TUNING.hUpright];
+  /** Rowing race: W/S set a persistent oar height instead of springing back. */
+  private rowing = false;
+
+  setRowing(on: boolean): void {
+    this.rowing = on;
+    this.hTargets[0] = this.hTargets[1] = DEFAULT_TUNING.hUpright;
+  }
 
   constructor() {
     window.addEventListener('keydown', (e) => {
@@ -61,14 +68,18 @@ export class KeyboardInput {
       const run = this.any(m.run);
       const jump = this.any(m.jump);
       let h = this.hTargets[i]!;
-      if (up) h = Math.min(1, h + 3 * dt);
+      if (this.rowing) {
+        if (up) h = Math.min(DEFAULT_TUNING.hUpright, h + 1.5 * dt);
+        else if (down) h = Math.max(0, h - 1.5 * dt);
+      } else if (up) h = Math.min(1, h + 3 * dt);
       else if (down) h = Math.max(0, h - 3 * dt);
       else h = DEFAULT_TUNING.hUpright;
       this.hTargets[i] = h;
       let hTarget = h;
-      if (run && !right && !left) hTarget = DEFAULT_TUNING.hBent;
+      if (run && !right && !left && !this.rowing) hTarget = DEFAULT_TUNING.hBent;
       let push = 0;
-      if (right) push = run ? 1 : 0.6;
+      if (this.rowing) push = right ? 1 : -0.3;
+      else if (right) push = run ? 1 : 0.6;
       else if (left) push = -0.3;
       out.push({ active: up || down || left || right || run || jump, input: { push, hTarget, jump } });
     }

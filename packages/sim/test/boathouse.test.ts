@@ -6,7 +6,7 @@ describe('boathouse', () => {
   it('is the last campaign level, reachable by id, with its own props and oars', () => {
     const d = levelById('b1');
     expect(d.theme).toBe('boathouse');
-    expect(CAMPAIGN[CAMPAIGN.length - 1]!.id).toBe('b1');
+    expect(CAMPAIGN[CAMPAIGN.length - 2]!.id).toBe('b1');
     expect(nextLevel('s5')!.id).toBe('b1');
     const kinds = new Set<string>();
     const lamps = new Set<string>();

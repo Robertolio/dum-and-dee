@@ -24,6 +24,7 @@ import { CAMERA_LEAD, COLORS, FLOOR_Y, GAME_H, LADDER_SCREEN_FRACTION, PX } from
 import type { ClientSync } from '@dd/net';
 import { Controller } from '../input/controller';
 import { Hud } from '../render/hud';
+import { RowingView, WATER_Y } from '../render/rowing';
 import { View } from '../render/view';
 import { DEE_STYLE, DUM_STYLE, drawFigure } from '../render/figures';
 import { drawBoat, drawLadder } from '../render/ladder';
@@ -76,6 +77,7 @@ export class GameScene extends Phaser.Scene {
   private walkAmp: [number, number] = [0, 0];
   private prevStepIdx: [number, number] = [0, 0];
   speech!: Speech;
+  private rowing!: RowingView;
   private seenAhead = new Set<string>();
   private waterWarned = false;
   private lastDt = 1 / 60;
@@ -186,6 +188,8 @@ export class GameScene extends Phaser.Scene {
     const floor = this.add.tileSprite(0, FLOOR_Y, W, GAME_H - FLOOR_Y, 'floor').setOrigin(0, 0).setDepth(5);
     const ceiling = this.add.tileSprite(0, 0, W, 48, 'ceiling').setOrigin(0, 0).setDepth(2);
     this.layers = { wall, pipes, floor, ceiling };
+    this.rowing = new RowingView(this);
+    this.rowing.onShout = (text) => sfx.megaphone(text.length);
     this.applyTheme();
 
     this.gProps = this.add.graphics().setDepth(6);
@@ -333,6 +337,8 @@ export class GameScene extends Phaser.Scene {
   /** Reset the run; keeps the current tuning and control settings. */
   reset(): void {
     this.state = createState(this.levelDef.data, this.tuning);
+    this.rowing?.reset();
+    this.controller?.setRowing(!!this.state.row);
     this.hintsShown.clear();
     this.resetWalk();
     this.accumulator = 0;
@@ -441,7 +447,8 @@ export class GameScene extends Phaser.Scene {
 
     this.announce();
     this.showHints();
-    this.coach.update(dt, this.lastInputs, this.controller.settings());
+    if (this.state.row) this.coach.updateRow(dt, this.lastInputs, this.controller.settings(), this.state);
+    else this.coach.update(dt, this.lastInputs, this.controller.settings());
     this.render();
   }
 
@@ -536,6 +543,12 @@ export class GameScene extends Phaser.Scene {
 
   private playMovementSounds(i: number): void {
     const p = this.state.players[i]!;
+    if (this.state.row) {
+      const up = this.state.row.jumpT > 0;
+      if (i === 0 && up !== this.prevAir[0]) (up ? sfx.jump : sfx.land).call(sfx);
+      if (i === 0) this.prevAir[0] = up;
+      return;
+    }
     const air = p.jumpT > 0;
     if (air && !this.prevAir[i]!) sfx.jump();
     if (!air && this.prevAir[i]!) sfx.land();
@@ -548,8 +561,58 @@ export class GameScene extends Phaser.Scene {
   private handleEvents(events: GameEvent[]): void {
     for (const e of events) {
       const sx = e.x !== undefined ? this.view.sx(e.x) : this.scale.width / 2;
-      const sy = e.y !== undefined ? this.view.sy(e.y) : FLOOR_Y - 200;
+      const sy = e.y !== undefined ? this.view.sy(e.y) : this.state.row ? WATER_Y - 20 : FLOOR_Y - 200;
+      this.rowing?.onEvent(e);
       switch (e.type) {
+        case 'gun':
+          sfx.gunshot();
+          this.banner('GO!', '#ffffff', 700);
+          break;
+        case 'oarDip': {
+          sfx.oarDip();
+          const [bx, by] = this.rowing.bladePos((e.player ?? 0) as 0 | 1);
+          this.burst(this.splash, 3, bx, by - 4);
+          break;
+        }
+        case 'oarClash':
+          sfx.oarClash();
+          this.speech.say(null, 'Together!', 'urgent');
+          this.floatText(sx, sy - 70, 'Oars clash!', '#ffd36b');
+          this.shake = 0.15;
+          break;
+        case 'duckHit':
+          sfx.quack();
+          sfx.hullCrack(6);
+          this.speech.say(this.nearestPlayer(e.x), 'Quack!', 'urgent');
+          this.burst(this.splash, 14, sx, sy + 20);
+          this.floatText(sx, sy - 40, 'Duck!', '#ffd36b');
+          this.shake = 0.2;
+          break;
+        case 'duckJump':
+          this.floatText(sx, sy - 30, `+${e.value}`, '#bff0c8');
+          break;
+        case 'buoyPop':
+          sfx.buoyBang();
+          this.burst(this.confetti, 24, sx, sy);
+          this.burst(this.splash, 10, sx, sy + 20);
+          this.floatText(sx, sy - 40, `+${e.value}`, '#ffd36b');
+          break;
+        case 'buoyBounce':
+          sfx.bonk();
+          this.floatText(sx, sy - 40, 'Too slow!', '#ffd36b');
+          break;
+        case 'bridgeHit':
+          sfx.bonk();
+          sfx.oarClash();
+          this.speech.say(null, e.value === 2 ? 'Oars up!' : 'Too high!', 'urgent');
+          this.floatText(sx, sy - 90, e.value === 2 ? 'Oars in the water!' : 'Bonk!', '#ffd36b');
+          this.burst(this.splinters, 12, sx, sy - 50);
+          this.shake = 0.25;
+          break;
+        case 'bridgePass':
+          sfx.cheer();
+          this.floatText(sx, sy - 70, `+${e.value}`, '#bff0c8');
+          break;
         case 'bump':
           sfx.bump(e.value ?? 1);
           this.speech.say(this.nearestPlayer(e.x), 'Ouch!', 'hint');
@@ -686,12 +749,12 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'bucketEmpty':
           sfx.lifeLost();
-          if (this.curTheme === 'boathouse') {
+          if (this.curTheme === 'boathouse' || this.curTheme === 'rowing') {
             sfx.hullBreak();
             this.burst(this.splinters, 40, sx, sy);
           }
           this.speech.say(null, 'Oh no!', 'urgent');
-          this.floatText(sx, sy - 60, this.curTheme === 'boathouse' ? 'The skiff is wrecked!' : STRINGS.newBucket, '#ffffff');
+          this.floatText(sx, sy - 60, this.curTheme === 'boathouse' || this.curTheme === 'rowing' ? 'The skiff is wrecked!' : STRINGS.newBucket, '#ffffff');
           this.shake = 0.3;
           break;
         case 'ladderSlipped':
@@ -708,11 +771,12 @@ export class GameScene extends Phaser.Scene {
         case 'levelDone':
           sfx.cheer();
           this.burst(this.confetti, 60, this.scale.width / 2, 120);
+          if (this.curTheme === 'rowing') sfx.horn();
           if (this.curTheme === 'boathouse') {
             sfx.waterIn();
             this.burst(this.splash, 50, this.view.sx(this.state.bucket.xP), FLOOR_Y - 40);
           }
-          this.time.delayedCall(this.curTheme === 'boathouse' ? 2400 : 1200, () => !this.online && this.onEnd?.('complete'));
+          this.time.delayedCall(this.curTheme === 'boathouse' ? 2400 : this.curTheme === 'rowing' ? 2000 : 1200, () => !this.online && this.onEnd?.('complete'));
           break;
         case 'comboUp':
           sfx.pop();
@@ -735,7 +799,7 @@ export class GameScene extends Phaser.Scene {
         case 'respawn':
           this.resetWalk();
           this.view.camX = this.targetCamX();
-          this.floatText(this.scale.width / 2, 170, this.curTheme === 'boathouse' ? 'New skiff!' : STRINGS.newBucket, '#ffffff');
+          this.floatText(this.scale.width / 2, 170, this.curTheme === 'boathouse' || this.curTheme === 'rowing' ? 'New skiff!' : STRINGS.newBucket, '#ffffff');
           break;
       }
     }
@@ -1064,13 +1128,16 @@ export class GameScene extends Phaser.Scene {
 
   private applyTheme(clear = true): void {
     if (!this.layers) return;
+    const rowing = this.curTheme === 'rowing';
+    this.rowing?.setVisible(rowing);
+    for (const l of Object.values(this.layers)) l.setVisible(!rowing);
     const pre = this.curTheme === 'studio' ? 'studio-' : this.curTheme === 'boathouse' ? 'boathouse-' : '';
     this.layers.wall.setTexture(pre ? `${pre}wall` : 'wall');
     this.layers.pipes.setTexture(pre ? `${pre}top` : 'pipes');
     this.layers.floor.setTexture(pre ? `${pre}floor` : 'floor');
     this.layers.ceiling.setTexture(pre ? `${pre}ceiling` : 'ceiling');
     sfx.boat = this.curTheme === 'boathouse';
-    this.bucketSprite?.setVisible(this.curTheme !== 'boathouse');
+    this.bucketSprite?.setVisible(this.curTheme !== 'boathouse' && !rowing);
     if (!clear) return;
     for (const img of this.lampSprites.values()) img.destroy();
     this.lampSprites.clear();
@@ -1132,6 +1199,10 @@ export class GameScene extends Phaser.Scene {
 
     this.updateCameraLayers();
 
+    if (s.row) {
+      this.renderRowing();
+      return;
+    }
     this.syncTheme();
     this.syncProps();
     this.drawGates();
@@ -1294,6 +1365,29 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.hud.draw(s, t);
+  }
+
+  private renderRowing(): void {
+    const s = this.state;
+    this.gWorld.clear();
+    this.gFx.clear();
+    this.gWater.clear();
+    this.gProps.clear();
+    this.rowing.draw(s, this.view, this.lastDt, this.scale.width, (i) => this.speech.mouthOpen(i));
+    const [ha, hb] = this.rowing.headPos();
+    this.speech.update(this.lastDt, [
+      { x: ha[0], y: ha[1] },
+      { x: hb[0], y: hb[1] },
+    ]);
+    sfx.setSlosh(0);
+    const thumbs = this.controller.thumbs();
+    const cfg = this.controller.settings();
+    this.gThumbs.clear();
+    if (cfg.source === 'touch') {
+      drawThumb(this.gThumbs, thumbs[0], COLORS.dum, cfg.posture === 'analog');
+      drawThumb(this.gThumbs, thumbs[1], COLORS.dee, cfg.posture === 'analog');
+    }
+    this.hud.draw(s, this.tuning);
   }
 
   /** Debug readout for the panel. */

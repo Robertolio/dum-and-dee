@@ -3,8 +3,8 @@ import type { Tuning } from './tuning';
 import { resetPlayerRow } from './ladder';
 import { primeBucket } from './bucket';
 
-const BREAKERS = new Set(['bump', 'slip', 'bucketBonk', 'lampHit', 'lampBreak', 'beamHit', 'lampTick']);
-const CLEANERS = new Set(['lampClean', 'pop', 'sweep', 'stepCaught']);
+const BREAKERS = new Set(['bump', 'slip', 'bucketBonk', 'lampHit', 'lampBreak', 'beamHit', 'lampTick', 'duckHit', 'buoyBounce', 'oarClash', 'bridgeHit']);
+const CLEANERS = new Set(['lampClean', 'pop', 'sweep', 'stepCaught', 'duckJump', 'buoyPop', 'bridgePass']);
 
 export function multFor(combo: number): number {
   return combo >= 10 ? 3 : combo >= 6 ? 2 : combo >= 3 ? 1.5 : 1;
@@ -46,7 +46,8 @@ function isClear(s: GameState, x: number): boolean {
     !s.steps.some((o) => o.x1 > lo && o.x0 < hi) &&
     !s.lamps.some((l) => l.x > lo && l.x < hi) &&
     !s.beams.some((b) => b.x1 > lo && b.x0 < hi) &&
-    !s.softs.some((o) => o.x > lo && o.x < hi && !o.done)
+    !s.softs.some((o) => o.x > lo && o.x < hi && !o.done) &&
+    !(s.row && (s.row.ducks.some((o) => !o.done && o.x > lo && o.x < hi) || s.row.buoys.some((o) => !o.done && o.x > lo && o.x < hi) || s.row.bridges.some((o) => o.x1 > lo && o.x0 < hi)))
   );
 }
 
@@ -118,10 +119,10 @@ export function updateProgress(s: GameState, t: Tuning): void {
     const water = Math.round(s.bucket.water);
     const waterBonus = Math.min(500, t.scoreWaterBonus * water);
     const lifeBonus = t.scoreLifeBonus * s.lives;
-    const timeBonus = Math.round(Math.max(0, s.par - s.time) * t.scoreTimeBonus);
+    const timeBonus = Math.round(Math.max(0, s.par - (s.row ? s.row.raceTime : s.time)) * t.scoreTimeBonus);
     s.score += waterBonus + lifeBonus + timeBonus;
     const stars = 1 + (water >= 50 ? 1 : 0) + (s.livesLost === 0 ? 1 : 0);
-    s.result = { score: Math.round(s.score), stars, water, waterBonus, lifeBonus, timeBonus, bestCombo: s.bestCombo, time: s.time };
+    s.result = { score: Math.round(s.score), stars, water, waterBonus, lifeBonus, timeBonus, bestCombo: s.bestCombo, time: s.row ? s.row.raceTime : s.time };
     s.events.push({ tick: s.tick, type: 'levelDone', value: stars });
   }
 }

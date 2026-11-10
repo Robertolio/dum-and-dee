@@ -13,7 +13,7 @@ describe('level loader', () => {
     for (const l of scripted) {
       const s = createState(l.data, T);
       const again = createState(levelById(l.id).data, T);
-      expect(s.steps.length + s.lamps.length + s.softs.length).toBeGreaterThan(5);
+      expect(s.steps.length + s.lamps.length + s.softs.length + (s.row ? s.row.ducks.length + s.row.buoys.length : 0)).toBeGreaterThan(5);
       expect(again.steps.map((o) => o.x0)).toEqual(s.steps.map((o) => o.x0));
       expect(s.levelLength).toBe(l.data.length);
       const secs = l.data.length / 2.4;
@@ -22,7 +22,7 @@ describe('level loader', () => {
     }
   });
   it('difficulty rises: obstacle density grows from level 1 to the last level', () => {
-    const dens = scripted.slice(1).map((l) => {
+    const dens = scripted.filter((l) => l.theme !== 'rowing').slice(1).map((l) => {
       const s = createState(l.data, T);
       return (s.steps.length + s.lamps.length * 1.5 + s.beams.length) / l.data.length;
     });

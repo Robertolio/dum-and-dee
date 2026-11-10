@@ -33,6 +33,7 @@ export class Controller implements InputProvider {
   private cfg: ControlSettings = { posture: 'analog', source: 'touch' };
   private override: [PlayerInput, PlayerInput] | null = null;
   private cssToGame = 1;
+  private rowing = false;
   private readonly thumbStates: [ThumbState, ThumbState] = [newThumb(), newThumb()];
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -63,6 +64,12 @@ export class Controller implements InputProvider {
         slot.latchedPush = 0;
       }
     }
+  }
+
+  /** Rowing race: oar height is persistent on the keyboard, and the digital posture lifts to a hover, not the highest point. */
+  setRowing(on: boolean): void {
+    this.rowing = on;
+    this.keyboard.setRowing(on);
   }
 
   /** Test hook: force inputs regardless of touch/keyboard. */
@@ -96,6 +103,7 @@ export class Controller implements InputProvider {
           input = { push: slot.latchedPush, hTarget: this.cfg.posture === 'analog' ? H_UP : H_BENT, jump: this.takeJump(slot) };
         }
         // Keyboard can always take over (useful on a laptop next to the phone).
+        if (this.rowing && this.cfg.posture === 'digital' && input.hTarget <= H_BENT + 0.01) input = { ...input, hTarget: (H_UP + H_BENT) / 2 };
         const k = kb[i]!;
         if (k.active) input = k.input;
       } else {

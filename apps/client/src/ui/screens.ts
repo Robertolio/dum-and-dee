@@ -16,6 +16,12 @@ function starsText(n: number): string {
 }
 
 /** Level select, game-over and level-complete screens (DOM overlays above the canvas). */
+/** Race time as m:ss.t, like the stopwatch at the finish. */
+export function raceClock(sec: number): string {
+  const m = Math.floor(sec / 60);
+  return `${m}:${(sec - m * 60).toFixed(1).padStart(4, '0')}`;
+}
+
 export class Screens {
   private readonly menu = el('div');
   private readonly result = el('div');
@@ -102,7 +108,13 @@ export class Screens {
         sfx.click();
         this.start(levelById('b1'));
       });
-      card.append(tv, bh);
+      const rw = el('button', 'primary', 'Rowing race');
+      rw.dataset.testid = 'btn-rowing';
+      rw.addEventListener('click', () => {
+        sfx.click();
+        this.start(levelById('r1'));
+      });
+      card.append(tv, bh, rw);
       const row = el('div', 'levels');
       for (const d of CAMPAIGN) {
         const b = el('button', 'level');
@@ -199,6 +211,7 @@ export class Screens {
     add('∞ Endless', 'btn-endless', () => this.start(levelById('endless')));
     add('TV Studio', 'panel-tvstudio', () => this.start(levelById('s1')));
     add('Boathouse', 'panel-boathouse', () => this.start(levelById('b1')));
+    add('Rowing race', 'panel-rowing', () => this.start(levelById('r1')));
     add('Levels', 'btn-levels', () => this.showMenu(true));
     add('Friends', 'btn-friends', () => {
       const v = this.view;
@@ -233,7 +246,7 @@ export class Screens {
       const r = s.result;
       card.append(
         el('p', 'big', `Score ${r.score}`),
-        el('p', '', `${def.theme === 'boathouse' ? 'Hull' : 'Water'} ${r.water}% (+${r.waterBonus}) · Lives (+${r.lifeBonus}) · Time ${r.time.toFixed(0)}s (+${r.timeBonus})`),
+        el('p', '', `${def.theme === 'boathouse' || def.theme === 'rowing' ? 'Hull' : 'Water'} ${r.water}% (+${r.waterBonus}) · Lives (+${r.lifeBonus}) · Time ${def.theme === 'rowing' ? raceClock(r.time) : r.time.toFixed(0) + 's'} (+${r.timeBonus})`),
         el('p', '', `Best combo ${r.bestCombo}`),
       );
     } else {
@@ -243,7 +256,7 @@ export class Screens {
     }
     const row = el('div', 'buttons');
     if (next) {
-      const nb = el('button', 'primary', next.theme !== def.theme ? `Next: ${next.name} (${next.theme === 'boathouse' ? 'Boathouse' : 'TV Studio'})` : 'Next level');
+      const nb = el('button', 'primary', next.theme !== def.theme ? `Next: ${next.name} (${next.theme === 'rowing' ? 'Rowing' : next.theme === 'boathouse' ? 'Boathouse' : 'TV Studio'})` : 'Next level');
       nb.dataset.testid = 'btn-next';
       nb.addEventListener('click', () => {
         sfx.click();

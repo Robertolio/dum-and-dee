@@ -69,6 +69,22 @@ describe('netsim: two predicted clients against the authoritative server', () =>
     expect(Math.abs(b.sync!.pred.lives - s.lives)).toBeLessThanOrEqual(1);
   });
 
+  it('rowing race: each seat rows its own oar, the server decides, and both clients end up with the server race state', () => {
+    const net = new NetSim({ latency: 50, jitter: 15, loss: 0.03 }, 5);
+    const [a, b] = startGame(net, 'r1');
+    net.run(14000);
+    const server = net.mgr.roomByCode(net.code)!.game!.state;
+    expect(server.row).not.toBeNull();
+    expect(server.row!.started).toBe(true);
+    expect(server.row!.strokes[0]).toBeGreaterThan(0);
+    expect(server.row!.strokes[1]).toBeGreaterThan(0);
+    for (const c of [a, b]) {
+      expect(c.sync!.pred.row).not.toBeNull();
+      expect(Math.abs(c.sync!.pred.row!.x - server.row!.x)).toBeLessThan(2.5);
+      expect(c.sync!.pred.row!.started).toBe(true);
+    }
+  });
+
   it('a partner that drops out pauses the game; after reconnecting both clients converge again', () => {
     const net = new NetSim({ latency: 50, jitter: 15, loss: 0.03 }, 11);
     const [a, b] = startGame(net, 'endless');

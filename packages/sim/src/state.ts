@@ -76,7 +76,49 @@ export interface BucketState {
   splash: number;
 }
 
-export type Theme = 'factory' | 'studio' | 'boathouse';
+export type Theme = 'factory' | 'studio' | 'boathouse' | 'rowing';
+
+export type BridgeKind = 'low' | 'arch' | 'wood' | 'stone';
+
+export interface RowRower {
+  /** Stroke position: 0 = catch (blade far forward), 1 = finish (pulled in). */
+  a: number;
+  /** Blade height above the water: 0 = in the water, 1 = as high as it goes. */
+  lift: number;
+  /** Blade is in the water and being pulled (set each tick). */
+  drive: boolean;
+}
+
+export interface RowDuck { x: number; done: boolean }
+export interface RowBuoy { x: number; done: boolean; cd: number; tries: number }
+export interface RowBridge { x0: number; x1: number; kind: BridgeKind; done: boolean; hit: boolean }
+
+/** State of the rowing race: the skiff is one body at x, driven by two rowers. */
+export interface RowState {
+  x: number;
+  v: number;
+  roll: number;
+  rollVel: number;
+  /** Height of the hull while jumping over a duck. */
+  jumpT: number;
+  jumpY: number;
+  jumpHeld: boolean;
+  /** Tick of the starting shot, and whether the race is running. */
+  gunTick: number;
+  started: boolean;
+  /** Race time in seconds since the shot. */
+  raceTime: number;
+  /** Smoothed synchrony 0..1 of the two rowers. */
+  sync: number;
+  rowers: [RowRower, RowRower];
+  clashCd: number;
+  bridgeCd: number;
+  ducks: RowDuck[];
+  buoys: RowBuoy[];
+  bridges: RowBridge[];
+  /** Strokes made by each rower, for the coach. */
+  strokes: [number, number];
+}
 
 export type LampKind = 'lamp' | 'meat' | 'boom' | 'oar';
 export type SoftKind = 'balloon' | 'web' | 'wheel' | 'fan' | 'weather' | 'onair' | 'applause' | 'buzzer' | 'wall' | 'pennant' | 'vest';
@@ -169,7 +211,16 @@ export type GameEventType =
   | 'push'
   | 'beamHit'
   | 'ladderSlipped'
-  | 'gameOver';
+  | 'gameOver'
+  | 'gun'
+  | 'oarDip'
+  | 'oarClash'
+  | 'duckHit'
+  | 'duckJump'
+  | 'buoyPop'
+  | 'buoyBounce'
+  | 'bridgeHit'
+  | 'bridgePass';
 
 export interface GameEvent {
   tick: number;
@@ -245,6 +296,8 @@ export interface GameState {
   par: number;
   finished: boolean;
   result: LevelResult | null;
+  /** Rowing race state (null in every other level). */
+  row: RowState | null;
   /** Events raised during the most recent step() call. */
   events: GameEvent[];
 }

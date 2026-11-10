@@ -183,7 +183,7 @@ export class ClientSync {
   private compose(decay: number, dtSec = 0): GameState {
     for (const [k, v] of this.off) this.off.set(k, Math.abs(v) < 1e-4 ? 0 : dtSec > 0 ? v * decay : v);
     const p = this.pred;
-    const v: GameState = { ...p, players: [{ ...p.players[0] }, { ...p.players[1] }], ladder: { ...p.ladder }, bucket: { ...p.bucket } };
+    const v: GameState = { ...p, players: [{ ...p.players[0] }, { ...p.players[1] }], ladder: { ...p.ladder }, bucket: { ...p.bucket }, row: p.row ? { ...p.row } : null };
     for (const s of SMOOTH) {
       const o = this.off.get(s.path.join('.')) ?? 0;
       if (o !== 0) rec(v, s.path)[s.path[2]] = rec(v, s.path)[s.path[2]]! + o;

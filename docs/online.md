@@ -194,3 +194,8 @@ Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per h
 
 ### Boathouse level
 `b1` (theme `boathouse`) is a normal level id, so online rooms can use it; the hull is `bucket.water` in the shared sim state and the visuals are client-only.
+
+### Rowing race (`r1`)
+- Server-authoritative like every level: the server steps the same sim from the per-seat input frames (`push` = stroke position, `h` = oar height, `jump`). Each seat rows its own oar (Dum = seat 0, Dee = seat 1), the skiff, ducks, buoys, bridges, synchrony and the race clock are shared state in `GameState.row`.
+- The whole `row` object travels in every snapshot (about 1.5 KB extra: 9 ducks, 8 buoys, 4 bridges). The client prediction copies `row` per frame; there is no smoothing of the skiff position after a correction, so a large correction shows as a small jump of the boat.
+- Covered by a netsim test (14 s at 100 ms round trip, 3% loss: both clients end within 2.5 we of the server). Not tested: a real network, a real phone, long races with a reconnect.

@@ -115,8 +115,45 @@ const boathouse: LevelDef[] = [
   data: compose(l.id, 'boathouse', l.seed, l.items as Item[], 0, l.gap),
 }));
 
-/** The campaign, in play order: factory levels, the TV studio, then the boathouse. */
-export const CAMPAIGN: LevelDef[] = [...factory, ...studio, ...boathouse];
+/**
+ * Rowing race: Dum and Dee row the skiff down the canal. The level is a fixed course of ducks (jump),
+ * buoys (hit them fast) and four kinds of bridges (oars up, but not too high).
+ */
+const rowing: LevelDef[] = [
+  {
+    id: 'r1',
+    name: 'Rowing race',
+    theme: 'rowing',
+    endless: false,
+    blurb: 'Row together down the canal',
+    data: {
+      id: 'r1',
+      theme: 'rowing',
+      length: 300,
+      par: 100,
+      lamps: [],
+      steps: [],
+      rowing: {
+        ducks: [34, 66, 104, 150, 160, 208, 222, 270, 282],
+        buoys: [50, 98, 118, 156, 176, 214, 262, 291],
+        bridges: [
+          { x0: 82, x1: 90, kind: 'low' },
+          { x0: 128, x1: 142, kind: 'arch' },
+          { x0: 186, x1: 196, kind: 'wood' },
+          { x0: 236, x1: 252, kind: 'stone' },
+        ],
+      },
+      hints: [
+        { x: 30, text: 'Ducks! Jump over them' },
+        { x: 46, text: 'Hit the buoys fast to pop them' },
+        { x: 76, text: 'Bridge: lift the oars, not too high' },
+      ],
+    },
+  },
+];
+
+/** The campaign, in play order: factory levels, the TV studio, the boathouse, then the rowing race. */
+export const CAMPAIGN: LevelDef[] = [...factory, ...studio, ...boathouse, ...rowing];
 export const LEVELS: LevelDef[] = [...CAMPAIGN, endless];
 
 export function nextLevel(id: string): LevelDef | undefined {

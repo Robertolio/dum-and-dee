@@ -1,4 +1,4 @@
-import type { Theme, BeamObstacle, SoftKind, SoftObstacle, GenState, LampKind, LampState, StepObstacle, StepKind } from './state';
+import type { BridgeKind, Theme, BeamObstacle, SoftKind, SoftObstacle, GenState, LampKind, LampState, StepObstacle, StepKind } from './state';
 import type { Tuning } from './tuning';
 
 export interface LevelLamp {
@@ -40,6 +40,8 @@ export interface LevelData {
   /** Par time (s) for the level-end time bonus. */
   par?: number;
   theme?: Theme;
+  /** Rowing race: where the ducks, buoys and bridges are. */
+  rowing?: { ducks: number[]; buoys: number[]; bridges: { x0: number; x1: number; kind: BridgeKind }[] };
   /** Endless mixing: the theme alternates every MIXED_ZONE we. */
   mixed?: boolean;
   /** Endless procedural generation ahead of the ladder. */

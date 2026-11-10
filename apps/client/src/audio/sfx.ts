@@ -328,6 +328,63 @@ class Sfx {
     for (let i = 0; i < 6; i++) this.tone('triangle', 900 + Math.random() * 1800, 500, 0.04, 0.09, 0.18 + i * 0.07);
   }
 
+  /** Starter's pistol: a sharp crack with a short tail. */
+  gunshot(): void {
+    if (!this.ready()) return;
+    this.burst('highpass', 1200, 0.7, 0.16, 0.7);
+    this.burst('lowpass', 900, 0.7, 0.35, 0.5);
+    this.tone('square', 260, 60, 0.12, 0.3);
+  }
+
+  /** Hollow plastic pop of a buoy. */
+  buoyBang(): void {
+    if (!this.ready()) return;
+    this.tone('sine', 520, 140, 0.16, 0.5);
+    this.burst('bandpass', 1500, 1.2, 0.1, 0.4);
+    this.tone('triangle', 900, 300, 0.08, 0.25, 0.02);
+  }
+
+  /** Ship horn for the finish. */
+  horn(): void {
+    if (!this.ready()) return;
+    this.tone('sawtooth', 196, 190, 0.7, 0.28);
+    this.tone('sawtooth', 247, 240, 0.7, 0.2);
+    this.tone('square', 98, 96, 0.7, 0.14);
+  }
+
+  quack(): void {
+    if (!this.ready()) return;
+    const f = 520 + Math.random() * 120;
+    this.tone('sawtooth', f, f * 0.6, 0.09, 0.22);
+    this.tone('sawtooth', f * 1.1, f * 0.55, 0.1, 0.2, 0.11);
+  }
+
+  /** Blade entering the water: a short soft splash. */
+  oarDip(): void {
+    if (!this.ready()) return;
+    this.shaped('highpass', 2200 + Math.random() * 1200, 0.7, 0.07, 0.07, 0.006, 0);
+    this.bloop(0.01, 0.05);
+  }
+
+  /** Oars clacking together. */
+  oarClash(): void {
+    if (!this.ready()) return;
+    this.tone('triangle', 330, 180, 0.07, 0.4);
+    this.tone('triangle', 410, 210, 0.07, 0.35, 0.05);
+    this.burst('bandpass', 1800, 2, 0.05, 0.25);
+  }
+
+  /** Megaphone shout: nasal buzzy blip. */
+  megaphone(length: number): void {
+    if (!this.ready()) return;
+    const n = Math.max(2, Math.min(5, Math.round(length / 2)));
+    for (let i = 0; i < n; i++) {
+      const f = 300 + Math.random() * 120;
+      this.tone('sawtooth', f, f * (0.85 + Math.random() * 0.3), 0.1, 0.16, i * 0.12);
+      this.tone('square', f * 2, f * 1.8, 0.1, 0.05, i * 0.12);
+    }
+  }
+
   /** Splash of the skiff entering the water. */
   waterIn(): void {
     if (!this.ready()) return;

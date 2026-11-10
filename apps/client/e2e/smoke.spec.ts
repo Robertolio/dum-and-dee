@@ -126,7 +126,8 @@ test.describe('Dum & Dee — one-screen prototype (mobile landscape)', () => {
     await page.keyboard.down('KeyD');
     await page.keyboard.down('ArrowRight');
     await page.keyboard.down('ArrowDown');
-    await page.waitForTimeout(1200);
+    await expect.poll(() => page.evaluate(() => window.__dd.getState().players[0]!.x), { timeout: 8000 }).toBeGreaterThan(x0 + 1);
+    await page.waitForTimeout(300);
     const r = await page.evaluate(() => {
       const s = window.__dd.getState();
       return { x: s.players[0]!.x, hB: s.players[1]!.h, inputs: window.__dd.lastInputs() };

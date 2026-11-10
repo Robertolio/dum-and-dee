@@ -9,6 +9,7 @@ import { evaluateStepCatch, integrateStepUps, updateStepTargets } from './stepup
 import { integrateBucket, primeBucket } from './bucket';
 import { integrateLamps } from './lamp';
 import { integrateBucketHits, integrateBeams, integrateSofts, integrateJump, resolveObstacles } from './obstacles';
+import { createRow, integrateRowing, placeRowers } from './rowing';
 import { respawn, updateProgress } from './progress';
 import { buildBeams, buildSofts, buildLamps, buildSteps, createGen, ENDLESS_LEVEL, extendLevel, type LevelData } from './level';
 
@@ -106,6 +107,7 @@ export function createState(level: LevelData = ENDLESS_LEVEL, t: Tuning = DEFAUL
     par: level.par ?? 90,
     finished: false,
     result: null,
+    row: createRow(level),
     events: [],
   };
   s.gen = createGen(level, s.lamps.length, s.steps.length, s.beams.length, s.softs.length);
@@ -185,6 +187,16 @@ function updateScore(s: GameState, t: Tuning): void {
 export function step(s: GameState, inputs: readonly [PlayerInput, PlayerInput], t: Tuning = DEFAULT_TUNING): GameState {
   s.events = [];
   if (s.gameOver || s.finished) return s;
+  if (s.row) {
+    integrateRowing(s, inputs, t);
+    updateWaterAndLives(s, t);
+    placeRowers(s, s.events.some((e) => e.type === 'respawn'));
+    updateScore(s, t);
+    updateProgress(s, t);
+    s.tick += 1;
+    s.time = s.tick * t.dt;
+    return s;
+  }
 
   for (let i = 0; i < 2; i++) {
     const inp = clampInput(inputs[i]!);
