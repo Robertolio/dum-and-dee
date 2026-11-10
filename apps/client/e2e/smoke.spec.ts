@@ -100,7 +100,6 @@ test.describe('Dum & Dee — one-screen prototype (mobile landscape)', () => {
     await page.getByTestId('set-digital').click();
     expect(await page.evaluate(() => window.__dd.getSettings().posture)).toBe('digital');
     await page.getByTestId('settings-done').click();
-    await page.getByTestId('panel-resume').click();
 
     // Nobody touching → both bent.
     await page.waitForTimeout(700);

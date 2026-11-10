@@ -14,8 +14,11 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
 export class SettingsUI {
   private readonly root = el('div', 'screen hidden');
   private back: (() => void) | null = null;
+  /** Set by main: true while the Friends screens are open (the gear then opens their settings). */
+  friendsOpen: () => boolean = () => false;
+  openFriendsSettings: () => void = () => undefined;
 
-  constructor(private readonly scene: GameScene, private readonly screens: Screens, private readonly showPrivacy: () => void) {
+  constructor(private readonly scene: GameScene, private readonly screens: Screens, private readonly showPrivacy: (back?: () => void) => void) {
     this.root.id = 'settings';
     this.root.dataset.testid = 'settings-screen';
     document.body.append(this.root);
@@ -24,26 +27,31 @@ export class SettingsUI {
       this.root.classList.add('hidden');
       return was;
     });
-    screens.onSettings = () => this.show();
-    screens.onPrivacy = () => this.showPrivacy();
+    screens.onSettings = (back) => this.show(back);
+    screens.onPrivacy = (back) => this.showPrivacy(back);
     const gear = document.getElementById('debug-toggle');
     gear?.setAttribute('aria-label', 'Settings');
     gear?.setAttribute('data-testid', 'settings-button');
     gear?.addEventListener('click', () => {
+      const view = this.screens.currentView();
       sfx.unlock();
       sfx.click();
       if (!this.root.classList.contains('hidden')) this.close();
-      else this.show();
+      else if (this.friendsOpen()) this.openFriendsSettings();
+      else this.show(() => this.screens.restoreView(view));
     });
   }
 
   private close(): void {
     this.root.classList.add('hidden');
-    if (this.screens.hasPausedUI()) return;
-    this.screens.showPanelOrResume();
+    const back = this.back;
+    this.back = null;
+    if (back) back();
+    else this.screens.restoreView('panel');
   }
 
-  show(): void {
+  show(back?: () => void): void {
+    if (back) this.back = back;
     this.scene.paused = true;
     const card = el('div', 'card narrow');
     card.append(el('h2', '', 'Settings'));
@@ -54,7 +62,7 @@ export class SettingsUI {
     dev.dataset.testid = 'settings-dev';
     dev.addEventListener('click', () => {
       document.getElementById('debug')?.classList.toggle('open');
-      this.root.classList.add('hidden');
+      this.close();
     });
     const done = el('button', 'primary', 'Done');
     done.dataset.testid = 'settings-done';

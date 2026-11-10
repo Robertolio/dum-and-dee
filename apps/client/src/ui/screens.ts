@@ -27,9 +27,9 @@ export class Screens {
   readonly overlayClosers: Array<() => boolean> = [];
   onPlay: (() => void) | null = null;
   onFriend: (() => void) | null = null;
-  onSettings: (() => void) | null = null;
-  onPrivacy: (() => void) | null = null;
-  onFriends: (() => void) | null = null;
+  onSettings: ((back: () => void) => void) | null = null;
+  onPrivacy: ((back: () => void) => void) | null = null;
+  onFriends: ((back: () => void) => void) | null = null;
   friendsCount: () => number = () => 0;
 
   constructor(private readonly scene: GameScene) {
@@ -157,9 +157,17 @@ export class Screens {
     return !this.menu.classList.contains('hidden') || !this.result.classList.contains('hidden');
   }
 
-  /** After closing a sub screen: back to the ☰ menu. */
-  showPanelOrResume(): void {
-    this.showPanel();
+  /** Which menu screen is on top right now, or null while playing. */
+  currentView(): 'home' | 'panel' | 'levels' | null {
+    return this.menu.classList.contains('hidden') ? null : this.view;
+  }
+
+  /** Return to a screen remembered with currentView(); null means back into the game. */
+  restoreView(v: 'home' | 'panel' | 'levels' | null): void {
+    if (v === 'panel') this.showPanel();
+    else if (v === 'home') this.showMenu();
+    else if (v === 'levels') this.showMenu(true);
+    else this.hideAll();
   }
 
   /** The ☰ menu: everything that is not "Play" or "Play with a friend". */
@@ -186,16 +194,19 @@ export class Screens {
     add('TV Studio', 'panel-tvstudio', () => this.start(levelById('s1')));
     add('Levels', 'btn-levels', () => this.showMenu(true));
     add('Friends', 'btn-friends', () => {
+      const v = this.view;
       this.menu.classList.add('hidden');
-      this.onFriends?.();
+      this.onFriends?.(() => this.restoreView(v === 'levels' ? 'panel' : v));
     });
     add('Settings', 'panel-settings', () => {
+      const v = this.view;
       this.menu.classList.add('hidden');
-      this.onSettings?.();
+      this.onSettings?.(() => this.restoreView(v));
     });
     add('Privacy', 'panel-privacy', () => {
+      const v = this.view;
       this.menu.classList.add('hidden');
-      this.onPrivacy?.();
+      this.onPrivacy?.(() => this.restoreView(v));
     });
     add('Home', 'panel-home', () => this.showMenu(), 'plain');
     this.menu.replaceChildren(card);

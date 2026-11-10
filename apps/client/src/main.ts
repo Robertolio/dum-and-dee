@@ -57,7 +57,9 @@ game.events.once(Phaser.Core.Events.READY, () => {
     const social = new SocialClient();
     const friends = new FriendsUI(scene, screens, online, social);
     social.start();
-    new SettingsUI(scene, screens, () => friends.showPrivacy());
+    const settingsUI = new SettingsUI(scene, screens, (back) => friends.showPrivacy(back));
+    settingsUI.friendsOpen = () => friends.isOpen();
+    settingsUI.openFriendsSettings = () => friends.showSettings();
     mountStartScreen(scene, screens, online, friends);
   };
   if (scene.scene.isActive()) mount();

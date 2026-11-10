@@ -83,7 +83,7 @@ export class FriendsUI {
       if (was) this.close();
       return was;
     });
-    screens.onFriends = () => this.showFriends();
+    screens.onFriends = (back) => this.showFriends(back);
     screens.friendsCount = () => this.badgeCount();
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') social.wake();
@@ -299,7 +299,7 @@ export class FriendsUI {
     return btn('Privacy', 'privacy-link', () => this.showPrivacy(), 'link');
   }
 
-  showPrivacy(): void {
+  showPrivacy(back?: () => void): void {
     const prev = [...this.root.childNodes];
     const prevHidden = this.root.classList.contains('hidden');
     const card = el('div', 'card narrow');
@@ -307,6 +307,11 @@ export class FriendsUI {
     for (const t of PRIVACY_TEXT) card.append(el('p', 'sub left', t));
     card.append(
       btn('Close', 'privacy-close', () => {
+        if (back) {
+          this.root.classList.add('hidden');
+          back();
+          return;
+        }
         this.root.replaceChildren(...prev);
         this.root.classList.toggle('hidden', prevHidden);
       }, 'primary'),
@@ -331,7 +336,14 @@ export class FriendsUI {
     this.root.dataset.view = '';
   }
 
-  showFriends(): void {
+  private backTo: (() => void) | null = null;
+
+  isOpen(): boolean {
+    return this.open;
+  }
+
+  showFriends(back?: () => void): void {
+    if (back) this.backTo = back;
     if (!loadIdentity()) {
       this.showOnboarding({ after: () => this.showFriends(), onSkip: () => this.screens.showMenu() });
       return;
@@ -412,7 +424,10 @@ export class FriendsUI {
       btn('Privacy', 'friends-privacy', () => this.showPrivacy(), 'link'),
       btn('Back', 'friends-back', () => {
         this.close();
-        this.screens.showMenu();
+        const b = this.backTo;
+        this.backTo = null;
+        if (b) b();
+        else this.screens.showMenu();
       }, 'primary'),
     );
     card.append(foot);
@@ -484,7 +499,7 @@ export class FriendsUI {
 
   // ---- settings ----
 
-  private showSettings(): void {
+  showSettings(): void {
     const me = this.social.me;
     const card = el('div', 'card narrow');
     card.append(el('h2', '', 'Settings'));
