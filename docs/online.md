@@ -12,14 +12,14 @@ Two devices play one game over the internet. The existing single Railway service
   - `game.ts`: `ServerGame`, the authoritative 60 Hz run of `@dd/sim`, and snapshot packing.
   - `clientsync.ts`: `ClientSync`, prediction, reconciliation, clock sync and smoothing (used by the browser client and by the netsim).
   - `netsim.ts`: deterministic network simulator (latency, jitter, loss) used by the tests.
-- Client: `apps/client/src/net/online.ts` (WebSocket, reconnect, ping), `ui/online.ts` (entry, lobby, QR, share, countdown, pause, result), `GameScene.startOnline()` (prediction loop instead of the local one).
+- Client: `apps/client/src/net/online.ts` (WebSocket, reconnect, ping), `ui/online.ts` (waiting screen, countdown, pause, result), `GameScene.startOnline()` (prediction loop instead of the local one).
 
 ## Flow
 
-1. Main menu, **Play together**: **New game** (server makes a 6-character code from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, random, no 0/O/1/I/L) or **Join** (type the code, or open `/?room=CODE`, which goes straight to the lobby after the Start screen).
-2. Lobby: code, QR code (client side, `qrcode-generator`), **Share via WhatsApp** (`https://wa.me/?text=...`), **Copy link**, **Share...** (Web Share API when present), choose Dum or Dee (a free seat), choose Analog/Digital for your own device, the host chooses **Continue** (campaign) or **Endless**; both press **Ready**, then a 3-2-1 countdown (server clock).
+1. Main menu, **Play with a friend** (the only way to play together in the UI). There is no room code, QR, join-by-code screen or lobby in the client any more; rooms still exist internally (the client opens one and invites the friend into it). Old `/?room=CODE` links still work.
+2. No lobby: the host is Dum, the other is Dee, the level is the host's current campaign level, controls are automatic per device (analog on touch, digital on desktop; override in the gear), both seats are marked ready automatically and the server's 3-2-1 countdown starts as soon as both are connected. The host sees 'Waiting for <name>...' with Cancel.
 3. Play: each device controls only its own man (a touch anywhere is that man). Level end and game over are decided by the server and shown on both devices at the same time; stars and progress are saved locally on each device.
-4. After the result both go back to the lobby (host can pick another level).
+4. After the result both can play again or leave.
 
 ## Protocol (JSON text frames, max 4 KB)
 
@@ -172,3 +172,12 @@ Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per h
 - Web Push delivery to real devices (auto-generated keys are unit-tested on SQLite and pg-mem only) (iOS home screen app, Android Chrome, desktop): the service worker, subscription and the server send path with a fake sender are tested, the VAPID signing/`web-push` call against real push services is not. `pnpm vapid` was run (keys not kept).
 - Real iPhone behaviour of the `?invite=` landing, "Add to Home Screen" and standalone detection (simulated by user agent only), real WhatsApp opening the link.
 - Admin endpoints against production.
+
+
+## Simplified intro and play-together flow (phase 5)
+- No start screen: one big Play button (also unlocks audio and Wake Lock); sound, music and settings (gear) sit in fixed corners; the menu icon holds Levels, Endless, privacy and settings.
+- Home has two buttons: Play (Continue when there is progress) and Play with a friend. Explanations are coach-marks in the first level (shown once, remembered in localStorage; keyboard hints only on desktop).
+- Friend flow: first time pick a name, then Invite a friend (share sheet or WhatsApp with link and friend code); afterwards the friends list has Play with <name>, and the friend gets an invite banner with a single Join button (or push).
+- In portrait only the Rotate notice is visible.
+- e2e: `online.spec.ts` now goes through the friends flow (invite, join, automatic countdown, reconnect, leave, cancel, dead link). Test servers accept `REGISTRATIONS_PER_HOUR_PER_IP` and `CODE_ATTEMPTS_PER_MINUTE` overrides.
+- Not done: the optional Dum/Dee swap.

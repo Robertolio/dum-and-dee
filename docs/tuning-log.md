@@ -115,3 +115,6 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 
 ## Round: identity, friends, invites (phase 4)
 - New package `packages/social` (identity, friends, teams, invites, push, admin, SQLite/Postgres store), wired into the same `/ws` and `/api/admin/*`; client: Friends screen, first-start name prompt (skippable), invite banner, `sw.js` for push, `public/privacy.html`. Details, env vars and Railway steps in `docs/online.md`.
+
+## Round: simplified intro and play-together (phase 5)
+- Principle: zero choices before the first moment of play, explanation only during play. Start screen removed, two-button home, coach-marks in level 1, automatic controls per device, lobby/room code/QR removed from the UI. See `docs/online.md`.
