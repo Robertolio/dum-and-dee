@@ -35,6 +35,8 @@ const CLOSED: Record<string, string> = {
   connection_lost: 'Connection lost. The game could not be resumed.',
 };
 
+const ENV_NAMES: Record<string, string> = { factory: 'Meat factory', studio: 'TV studio', boathouse: 'Boathouse', rowing: 'Rowing race', endless: 'Endless' };
+
 /** Online two-device play: entry, lobby (code, QR, share, seats, ready), countdown, pause, results. */
 export class OnlineUI {
   readonly client = new OnlineClient();
@@ -51,6 +53,7 @@ export class OnlineUI {
   private readonly toastEl = el('div', 'toast hidden');
   private toastTimer = 0;
   private showAllLevels = false;
+  private rank: Extract<OnlineEvent, { type: 'lb' }> | null = null;
   private setupSent = false;
   private autoReady = true;
   private partnerName = '';
@@ -175,7 +178,12 @@ export class OnlineUI {
         this.startGame(e.level, e.sync);
         break;
       case 'end':
+        this.rank = null;
         this.showResult(e.end);
+        break;
+      case 'lb':
+        this.rank = e;
+        this.paintRank();
         break;
       case 'pause':
         this.pauseUntil = performance.now() + (e.until - this.client.serverNow());
@@ -450,10 +458,22 @@ export class OnlineUI {
     });
     const leave = tid(el('button', 'link', 'Leave'), 'online-result-leave');
     leave.addEventListener('click', () => this.leaveToMenu());
-    card.append(back, leave);
+    card.append(tid(el('div', 'rankline'), 'online-rank'), back, leave);
     this.resultBox = tid(card, 'online-result');
     this.overlay.replaceChildren(card);
     this.overlay.classList.remove('hidden');
+    this.paintRank();
+  }
+
+  /** "You are #12 this week": filled in when the server has registered the run. */
+  private paintRank(): void {
+    const box = this.overlay.querySelector<HTMLElement>('[data-testid="online-rank"]');
+    const r = this.rank;
+    if (!box || !r) return;
+    const env = ENV_NAMES[r.env] ?? r.env;
+    box.replaceChildren();
+    if (r.duo) box.append(el('p', '', `Duo, ${env}: #${r.duo.week} this week, #${r.duo.all} all time`));
+    if (r.player) box.append(el('p', 'big', `You are #${r.player.week} this week (#${r.player.all} all time)`));
   }
 
   private showClosed(text: string): void {

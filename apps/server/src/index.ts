@@ -3,7 +3,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { MAX_MSG_BYTES, RoomManager } from '@dd/net';
-import { Hub, Social, createAdminHandler, createPushSender, openStore, resolveVapid, type HubConn } from '@dd/social';
+import { Hub, Leaderboard, Social, createAdminHandler, createLeaderboardHandler, createPushSender, openStore, resolveVapid, type HubConn } from '@dd/social';
 
 interface ConnLike {
   message(raw: string): void;
@@ -30,15 +30,18 @@ export async function attachOnline(servers: Server[]): Promise<Online> {
   const mgr = new RoomManager({ now: clock, randomBytes: (n) => randomBytes(n) });
   let hub: Hub | null = null;
   let admin: ReturnType<typeof createAdminHandler> | null = null;
+  let board: ReturnType<typeof createLeaderboardHandler> | null = null;
   const health = { db: 'none' as string, vapid: false };
   try {
     const db = await openStore(process.env);
     const social = new Social(db, { now: () => Date.now(), randomBytes: (n) => randomBytes(n), registrationsPerHourPerIp: Number(process.env.REGISTRATIONS_PER_HOUR_PER_IP) || 8, codeAttemptsPerMinute: Number(process.env.CODE_ATTEMPTS_PER_MINUTE) || 10 });
-    hub = new Hub(mgr, social, createPushSender({ ...process.env, ...(await resolveVapid(db, process.env)) }), { now: () => Date.now() });
+    const lb = new Leaderboard(db, social, { now: () => Date.now(), randomBytes: (n) => randomBytes(n) });
+    board = createLeaderboardHandler(lb, social);
+    hub = new Hub(mgr, social, createPushSender({ ...process.env, ...(await resolveVapid(db, process.env)) }), { now: () => Date.now(), leaderboard: lb });
     const h = hub;
     health.db = db.kind === 'pg' ? 'postgres' : db.kind;
     health.vapid = !!h.push.publicKey;
-    admin = createAdminHandler(social, process.env.ADMIN_KEY, () => Date.now(), { onPlayerRemoved: (id) => h.kick(id), onPlayerChanged: (id) => void h.refresh(id) });
+    admin = createAdminHandler(social, process.env.ADMIN_KEY, () => Date.now(), { onPlayerRemoved: (id) => h.kick(id), onPlayerChanged: (id) => void h.refresh(id) }, lb);
     console.log(`Social: ${db.kind} store, push ${h.push.publicKey ? (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY ? 'on (keys from env)' : 'on (keys from db)') : 'off'}, admin ${process.env.ADMIN_KEY ? 'on' : 'off'}`);
     void social.purgeInactive().catch(() => undefined);
     setInterval(() => void social.purgeInactive().catch(() => undefined), 24 * 3600_000).unref();
@@ -114,6 +117,7 @@ export async function attachOnline(servers: Server[]): Promise<Online> {
         res.end(JSON.stringify({ ok: true, db: health.db, vapid: health.vapid }));
         return true;
       }
+      if (board && (await board(req, res, clientIp(req)))) return true;
       if (!admin) return false;
       return admin(req, res, clientIp(req));
     },

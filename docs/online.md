@@ -199,3 +199,18 @@ Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per h
 - Server-authoritative like every level: the server steps the same sim from the per-seat input frames (`push` = stroke position, `h` = oar height, `jump`). Each seat rows its own oar (Dum = seat 0, Dee = seat 1), the skiff, ducks, buoys, bridges, synchrony and the race clock are shared state in `GameState.row`.
 - The whole `row` object travels in every snapshot (about 1.5 KB extra: 9 ducks, 8 buoys, 4 bridges). The client prediction copies `row` per frame; there is no smoothing of the skiff position after a correction, so a large correction shows as a small jump of the boat.
 - Covered by a netsim test (14 s at 100 ms round trip, 3% loss: both clients end within 2.5 we of the server). Not tested: a real network, a real phone, long races with a reconnect.
+
+## Leaderboard
+
+What counts: only **online two-player runs** that the server itself simulated. Solo runs never count (the client could send anything; there is no honest way to verify them). The client never submits a score. At the end of a run `RoomManager.onRunEnd` hands `{level, score, ticks, players}` to the `Leaderboard`. The players are the identities that authenticated on the game socket (`auth` with the device token); anonymous seats are not recorded. A duo row needs both seats identified; each identified player also gets an individual row.
+
+- Scores: a completed level counts with its `result.score`; Endless counts at game over. A game over in a campaign level is not recorded.
+- Duos are listed as `<A> & <B>` (names sorted, built from the two current names). Players get the **duo score of the run credited to each of the two** (the sim has no per-player score, so that is the fairest honest number). Nothing but names and scores leaves the server (no ids).
+- Environments: Meat factory, TV studio, Boathouse, Rowing race, Endless, and Overall. A list entry is the best run of that duo/player in the environment; Overall is the sum of their best run per environment. The rowing race is ranked by score (which includes a time bonus), no separate time list.
+- Weeks run from Monday 00:00 Europe/Amsterdam (`weekStart`, DST-safe). "This week" matches the stored week of each run; "All time" ignores it.
+- Plausibility (`plausible`): at least 5 s played, not faster than 9 we/s over the level length, at most 800 points per second plus 3000. Anything else is dropped silently.
+- Table `scores` (migration 3): `id, kind (duo|player), p1, p2, env, level, score, time_ms, created, week, hidden`. Delete me removes every row with the player's id (duo rows too); blocked players and names that fail the profanity filter are left out of every list.
+- Read API: `GET /api/leaderboard?kind=duo|player&env=overall|factory|studio|boathouse|rowing|endless&range=week|all`. Optional header `x-dd-token` marks your own rows (`me`) and friends (`friend`). 25 rows plus your own position when you are outside them. Lists are cached 15 s per filter, 60 reads/min per IP, public responses `Cache-Control: public, max-age=10`. There is no search by name.
+- Admin (header `x-admin-key`, same as the player admin): `GET /api/admin/scores?limit=&env=`, `POST /api/admin/scores/:id/hide|unhide`, `DELETE /api/admin/scores/:id`. Hiding a player entirely is the existing block.
+- After a run each identified player gets a `{t:'lb', env, score, duo:{week,all}, player:{week,all}}` message on the game socket; the result screen shows "You are #12 this week".
+- UI: "Leaderboard" on the home menu and in the ☰ menu; Back returns to where it was opened from.

@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { RateLimiter } from './ratelimit';
 import type { Social } from './service';
+import type { Leaderboard } from './leaderboard';
 
 export interface AdminHooks {
   /** Called after a player was deleted or blocked so live sockets can be dropped. */
@@ -41,7 +42,7 @@ const readBody = (req: IncomingMessage): Promise<Record<string, unknown>> =>
   });
 
 /** Basic admin API under /api/admin/*, protected by the ADMIN_KEY env var (disabled, 404, when unset). Returns true when the request was handled. */
-export function createAdminHandler(social: Social, adminKey: string | undefined, now: () => number, hooks: AdminHooks = {}) {
+export function createAdminHandler(social: Social, adminKey: string | undefined, now: () => number, hooks: AdminHooks = {}, lb?: Leaderboard) {
   const fails = new RateLimiter(10, 60_000, now);
   return async (req: IncomingMessage, res: ServerResponse, ip: string): Promise<boolean> => {
     const url = new URL(req.url ?? '/', 'http://x');
@@ -53,6 +54,24 @@ export function createAdminHandler(social: Social, adminKey: string | undefined,
       return json(res, 401, { error: 'unauthorized' }), true;
     }
     const parts = url.pathname.split('/').filter(Boolean); // api admin players [id [action]]
+    if (parts[2] === 'scores' && lb) {
+      const sid = parts[3];
+      if (!sid) {
+        if (req.method !== 'GET') return json(res, 405, { error: 'method' }), true;
+        const limit = Number(url.searchParams.get('limit') ?? 100);
+        return json(res, 200, { scores: await lb.adminList(Number.isFinite(limit) ? limit : 100, url.searchParams.get('env') ?? undefined) }), true;
+      }
+      if (!/^[A-Za-z0-9]{12}$/.test(sid)) return json(res, 400, { error: 'bad_id' }), true;
+      if (req.method === 'DELETE' && !parts[4]) {
+        const ok = await lb.adminDelete(sid);
+        return json(res, ok ? 200 : 404, { ok }), true;
+      }
+      if (req.method === 'POST' && (parts[4] === 'hide' || parts[4] === 'unhide')) {
+        const ok = await lb.adminHide(sid, parts[4] === 'hide');
+        return json(res, ok ? 200 : 404, { ok }), true;
+      }
+      return json(res, 404, { error: 'not_found' }), true;
+    }
     if (parts[2] !== 'players') return json(res, 404, { error: 'not_found' }), true;
     const id = parts[3];
     if (!id) {

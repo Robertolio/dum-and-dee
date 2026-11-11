@@ -7,6 +7,7 @@ import { Screens } from './ui/screens';
 import { OnlineUI } from './ui/online';
 import { FriendsUI } from './ui/friends';
 import { SettingsUI } from './ui/settings';
+import { LeaderboardUI } from './ui/leaderboard';
 import { SocialClient } from './net/social';
 import { levelById } from '@dd/sim';
 import { mountAudioButtons } from './audio/sfx';
@@ -60,6 +61,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
     const settingsUI = new SettingsUI(scene, screens, (back) => friends.showPrivacy(back));
     settingsUI.friendsOpen = () => friends.isOpen();
     settingsUI.openFriendsSettings = () => friends.showSettings();
+    new LeaderboardUI(screens);
     mountStartScreen(scene, screens, online, friends);
   };
   if (scene.scene.isActive()) mount();

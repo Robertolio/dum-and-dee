@@ -44,6 +44,7 @@ export class Screens {
   onSettings: ((back: () => void) => void) | null = null;
   onPrivacy: ((back: () => void) => void) | null = null;
   onFriends: ((back: () => void) => void) | null = null;
+  onLeaderboard: ((back: () => void) => void) | null = null;
   friendsCount: () => number = () => 0;
 
   constructor(private readonly scene: GameScene) {
@@ -174,7 +175,15 @@ export class Screens {
       this.menu.classList.add('hidden');
       this.onFriend?.();
     });
-    card.append(play, friend);
+    const board = el('button', 'big', 'Leaderboard');
+    board.dataset.testid = 'btn-leaderboard';
+    board.addEventListener('click', () => {
+      sfx.unlock();
+      sfx.click();
+      this.menu.classList.add('hidden');
+      this.onLeaderboard?.(() => this.restoreView('home'));
+    });
+    card.append(play, friend, board);
     this.menu.append(card);
     this.menu.classList.remove('hidden');
   }
@@ -220,6 +229,11 @@ export class Screens {
     add('∞ Endless', 'btn-endless', () => this.start(levelById('endless')));
     for (const [theme, label, id] of ENVS) add(label, `panel-${id}`, () => this.start(this.envLevel(theme)));
     add('Levels', 'btn-levels', () => this.showMenu(true));
+    add('Leaderboard', 'panel-leaderboard', () => {
+      const v = this.view;
+      this.menu.classList.add('hidden');
+      this.onLeaderboard?.(() => this.restoreView(v === 'levels' ? 'panel' : v));
+    });
     add('Friends', 'btn-friends', () => {
       const v = this.view;
       this.menu.classList.add('hidden');

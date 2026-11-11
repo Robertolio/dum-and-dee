@@ -30,7 +30,8 @@ export type OnlineEvent =
   | { type: 'resume' }
   | { type: 'closed'; reason: string }
   | { type: 'error'; code: string }
-  | { type: 'invite_sent'; delivered: 'live' | 'push' | 'none' };
+  | { type: 'invite_sent'; delivered: 'live' | 'push' | 'none' }
+  | { type: 'lb'; env: string; score: number; duo: { week: number; all: number } | null; player: { week: number; all: number } | null };
 
 const SESSION_KEY = 'dd-online';
 const GIVE_UP_MS = 70_000;
@@ -353,6 +354,9 @@ export class OnlineClient {
       case 'err':
         if (m.code === 'no_such_room' || m.code === 'in_progress' || m.code === 'room_full') OnlineClient.clearSession();
         this.emit({ type: 'error', code: m.code });
+        break;
+      case 'lb':
+        this.emit({ type: 'lb', env: m.env, score: m.score, duo: m.duo, player: m.player });
         break;
       case 'hello':
         break;

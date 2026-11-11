@@ -6,3 +6,4 @@ export * from './service';
 export * from './hub';
 export * from './admin';
 export * from './push';
+export * from './leaderboard';

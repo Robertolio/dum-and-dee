@@ -148,3 +148,8 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 - Campaign: f0, s1, b1, r1, f3, s3, b2, r2, f5, s5, b3, r3 (ids unchanged, so dd-progress needs no migration). f1, f2, f4, s2, s4 are extra levels in the Levels list. r2/r3 are generated courses with clearance rules checked by tests.
 - Online: the server owns the level. Either player may switch (last wins); a switch during play restarts for both; completing a level advances the room to the next one.
 - Boathouse end sign: Asyntis logo from `apps/client/public/art/asyntis.png` (text fallback until the file exists). Rowing has no end gate.
+
+## Leaderboard
+
+- Plausibility limits (`plausible` in `packages/social/src/leaderboard.ts`): 800 points per second plus 3000, 9 we/s maximum average speed. They are generous on purpose; they only stop absurd values. Tighten them once real runs show the normal range.
+- Cache 15 s and 60 reads per minute per IP for the read API.

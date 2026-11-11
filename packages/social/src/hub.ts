@@ -1,9 +1,12 @@
-import type { Conn, ConnCtx, RoomManager } from '@dd/net';
+import type { Conn, ConnCtx, RoomManager, RunEnd } from '@dd/net';
+import { levelById } from '@dd/sim';
+import type { LbEnv, Leaderboard } from './leaderboard';
 import type { PushSender } from './push';
 import type { Result, Social } from './service';
 
 export interface HubOptions {
   now: () => number;
+  leaderboard?: Leaderboard;
 }
 
 export interface HubConn {
@@ -32,7 +35,24 @@ export class Hub {
     readonly social: Social,
     readonly push: PushSender,
     private readonly o: HubOptions,
-  ) {}
+  ) {
+    const lb = o.leaderboard;
+    if (lb) mgr.onRunEnd = (e) => void this.recordRun(lb, e).catch(() => undefined);
+  }
+
+  /** Server-side scoring of a finished online run; each identified player is told their rank. */
+  private async recordRun(lb: Leaderboard, e: RunEnd): Promise<void> {
+    if (e.kind === 'gameover' && !levelById(e.level).endless) return;
+    const r = await lb.record({ level: e.level, score: e.score, ticks: e.ticks, distance: e.distance, players: e.players });
+    if (!r) return;
+    for (let i = 0; i < 2; i++) {
+      const id = e.players[i];
+      const ctx = e.conns[i];
+      if (!id || !ctx) continue;
+      const mine = await lb.playerRanks(r.env as LbEnv, id);
+      ctx.conn.send(JSON.stringify({ t: 'lb', env: r.env, score: r.score, duo: r.duo, player: mine }));
+    }
+  }
 
   isOnline = (id: string): boolean => (this.online.get(id)?.size ?? 0) > 0;
 
@@ -102,6 +122,7 @@ export class Hub {
   private async attach(hc: HubConn, id: string): Promise<void> {
     if (hc.playerId && hc.playerId !== id) this.online.get(hc.playerId)?.delete(hc);
     hc.playerId = id;
+    hc.ctx.playerId = id;
     const first = !this.isOnline(id);
     let set = this.online.get(id);
     if (!set) this.online.set(id, (set = new Set()));
@@ -159,6 +180,7 @@ export class Hub {
         this.send(hc, { t: 'deleted' });
         this.online.get(me)?.delete(hc);
         hc.playerId = null;
+        hc.ctx.playerId = null;
         for (const f of friends) await this.refresh(f);
         return;
       }

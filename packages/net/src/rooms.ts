@@ -84,6 +84,20 @@ export interface ConnCtx {
   ctlBucket: Bucket;
   strikes: number;
   closed: boolean;
+  /** Set by the social layer once this socket proved who it is (never client-asserted). */
+  playerId: string | null;
+}
+
+/** A finished server-authoritative run, handed to the leaderboard. */
+export interface RunEnd {
+  level: string;
+  kind: 'complete' | 'gameover';
+  score: number;
+  ticks: number;
+  time: number;
+  distance: number;
+  players: [string | null, string | null];
+  conns: [ConnCtx | null, ConnCtx | null];
 }
 
 const VALID_LEVELS = new Set(LEVELS.map((l) => l.id));
@@ -95,6 +109,7 @@ export class RoomManager {
   private nextId = 1;
   private readonly createLog = new Map<string, number[]>();
   private readonly o: Required<RoomOptions>;
+  onRunEnd: ((e: RunEnd) => void) | null = null;
 
   constructor(opts: RoomOptions) {
     this.o = {
@@ -138,6 +153,7 @@ export class RoomManager {
       ctlBucket: new Bucket(8, 20, now),
       strikes: 0,
       closed: false,
+      playerId: null,
     };
     this.conns.add(ctx);
     this.send(ctx, { t: 'hello', v: PROTO, ms: now });
@@ -349,6 +365,22 @@ export class RoomManager {
     const g = room.game;
     if (!g) return;
     const s = g.state;
+    if (this.onRunEnd) {
+      try {
+        this.onRunEnd({
+          level: room.level,
+          kind: s.finished ? 'complete' : 'gameover',
+          score: s.finished && s.result ? s.result.score : Math.floor(s.score),
+          ticks: s.tick,
+          time: s.result?.time ?? s.time,
+          distance: s.distance,
+          players: [room.members[0]?.conn?.playerId ?? null, room.members[1]?.conn?.playerId ?? null],
+          conns: [room.members[0]?.conn ?? null, room.members[1]?.conn ?? null],
+        });
+      } catch {
+        /* the leaderboard never breaks a game */
+      }
+    }
     if (s.finished) {
       const nx = nextLevel(room.level);
       if (nx) room.level = nx.id;

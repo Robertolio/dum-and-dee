@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { RoomManager, type Conn } from '@dd/net';
-import { Hub, Social, openSqlite, type PushSender } from '../src';
+import { Hub, Leaderboard, Social, openSqlite, type PushSender } from '../src';
 
 export const mkClock = () => {
   let t = 1_000_000;
@@ -41,7 +41,8 @@ export const mkHub = async (push?: PushSender) => {
       return 'ok';
     },
   };
-  const hub = new Hub(mgr, social, sender, { now: clock.now });
+  const lb = new Leaderboard(db, social, { now: clock.now, randomBytes: (n) => randomBytes(n) });
+  const hub = new Hub(mgr, social, sender, { now: clock.now, leaderboard: lb });
   const client = (ip = '1.1.1.1') => {
     const conn = new FakeConn();
     const hc = hub.connect(conn, ip)!;
@@ -51,5 +52,5 @@ export const mkHub = async (push?: PushSender) => {
     };
     return { conn, hc, say };
   };
-  return { hub, social, mgr, db, clock, client, sent };
+  return { hub, social, mgr, db, clock, client, sent, lb };
 };

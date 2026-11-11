@@ -126,6 +126,7 @@ export class Social {
     await q('DELETE FROM teams WHERE a = ? OR b = ?', id, id);
     await q('DELETE FROM invites WHERE from_id = ? OR to_id = ?', id, id);
     await q('DELETE FROM push_subscriptions WHERE player_id = ?', id);
+    await q('DELETE FROM scores WHERE p1 = ? OR p2 = ?', id, id);
     await q('DELETE FROM players WHERE id = ?', id);
   }
 

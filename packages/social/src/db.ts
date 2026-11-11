@@ -67,6 +67,27 @@ export const MIGRATIONS: Array<{ v: number; sql: string[] }> = [
     v: 2,
     sql: [`CREATE TABLE settings (k TEXT PRIMARY KEY, v TEXT NOT NULL)`],
   },
+  {
+    v: 3,
+    sql: [
+      `CREATE TABLE scores (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        p1 TEXT NOT NULL,
+        p2 TEXT NOT NULL,
+        env TEXT NOT NULL,
+        level TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        time_ms INTEGER NOT NULL,
+        created BIGINT NOT NULL,
+        week BIGINT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0
+      )`,
+      `CREATE INDEX scores_lookup ON scores (kind, env, week)`,
+      `CREATE INDEX scores_p1 ON scores (p1)`,
+      `CREATE INDEX scores_p2 ON scores (p2)`,
+    ],
+  },
 ];
 
 export async function migrate(db: Db): Promise<void> {

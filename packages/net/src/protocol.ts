@@ -69,6 +69,7 @@ export type ServerMsg =
   | { t: 'resume' }
   | { t: 'pong'; c: number; s: number }
   | { t: 'closed'; reason: 'partner_left' | 'timeout' | 'idle' | 'server' }
+  | { t: 'lb'; env: string; score: number; duo: { week: number; all: number } | null; player: { week: number; all: number } | null }
   | { t: 'err'; code: string };
 
 const isNum = (v: unknown, lo: number, hi: number): v is number => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
