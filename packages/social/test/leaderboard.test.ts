@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { levelById } from '@dd/sim';
 import { describe, expect, it } from 'vitest';
-import { Leaderboard, plausible, weekStart, createAdminHandler } from '../src';
+import { Leaderboard, plausible, weekStart, createAdminHandler, createLeaderboardHandler } from '../src';
 import { mkClock, mkHub, mkSocial, tick } from './helpers';
 
 const setup = async () => {
@@ -192,5 +193,101 @@ describe('hub: server-side registration of online runs', () => {
     const G1 = h.client('1.1.1.1');
     await G1.say({ t: 'auth', token: 'f'.repeat(48) });
     expect(G1.hc.ctx.playerId).toBeNull();
+  });
+});
+
+describe('solo list', () => {
+  const solo = (level: string, score: number, time: number, distance = 0) => ({ level, score, time, distance });
+
+  it('keeps plausible solo runs in their own list; dubious ones are stored flagged and never shown', async () => {
+    const { lb, reg, db } = await setup();
+    const a = await reg('Rob');
+    const ok = await lb.submitSolo(a, solo('f0', 2500, 80));
+    expect(ok).toMatchObject({ status: 'ok', env: 'factory', rank: { week: 1, all: 1 } });
+    expect(await lb.submitSolo(a, solo('f0', 900_000, 80))).toEqual({ status: 'unexpected' });
+    expect(await lb.submitSolo(a, solo('f0', 2500, 2))).toEqual({ status: 'unexpected' });
+    expect(await lb.submitSolo(a, solo('endless', 600, 30, 5000))).toEqual({ status: 'unexpected' });
+    expect(await lb.submitSolo(a, solo('nope', 1, 80))).toEqual({ status: 'rejected' });
+    expect(await lb.submitSolo('ghost12345', solo('f0', 100, 80))).toEqual({ status: 'rejected' });
+    const v = await lb.view('solo', 'overall', 'all', a);
+    expect(v.entries.map((e) => [e.name, e.score, e.me])).toEqual([['Rob', 2500, true]]);
+    const flagged = await db.all<{ hidden: number }>("SELECT hidden FROM scores WHERE kind = 'solo' AND hidden = 2");
+    expect(flagged).toHaveLength(3);
+    // Strictly separate from the server-authoritative lists.
+    expect((await lb.view('player', 'overall', 'all', null)).entries).toHaveLength(0);
+    expect((await lb.view('duo', 'overall', 'all', null)).entries).toHaveLength(0);
+    await lb.record(run('f0', 9000, a, null));
+    expect((await lb.view('solo', 'factory', 'all', null)).entries.map((e) => e.score)).toEqual([2500]);
+    expect((await lb.view('player', 'factory', 'all', null)).entries.map((e) => e.score)).toEqual([9000]);
+  });
+
+  it('limits are per environment and sensible: realistic runs pass, speed and points beyond the limits do not', () => {
+    expect(plausible({ level: 'r1', score: 4000, ticks: 100 * 60, distance: 0 })).toBe(true);
+    expect(plausible({ level: 'r1', score: 4000, ticks: 20 * 60, distance: 0 })).toBe(false);
+    expect(plausible({ level: 'f0', score: 3000, ticks: 40 * 60, distance: 0 })).toBe(true);
+    expect(plausible({ level: 'f0', score: 3000, ticks: Math.floor(levelById('f0').data.length / 9 - 1) * 60, distance: 0 })).toBe(false);
+    expect(plausible({ level: 'endless', score: 9000, ticks: 60 * 60, distance: 500 })).toBe(true);
+    expect(plausible({ level: 'endless', score: 40_000, ticks: 60 * 60, distance: 600 })).toBe(false);
+    expect(plausible({ level: 'f0', score: 3000, ticks: 4 * 3600 * 60, distance: 0 })).toBe(false);
+  });
+
+  it('Delete me, profanity, blocking and admin hide/delete apply to solo scores too', async () => {
+    const { lb, reg, social, db, clock } = await setup();
+    const a = await reg('Rob', '1.1.1.1');
+    const b = await reg('Mia', '2.2.2.2');
+    await lb.submitSolo(a, solo('s1', 2000, 90));
+    await lb.submitSolo(b, solo('s1', 1800, 90));
+    await db.run('UPDATE players SET name = ? WHERE id = ?', ['shit', b]);
+    expect((await lb.view('solo', 'studio', 'all', null)).entries.map((e) => e.name)).toEqual(['Rob']);
+    await db.run('UPDATE players SET name = ? WHERE id = ?', ['Mia', b]);
+    await social.adminBlock(b, true);
+    expect((await lb.view('solo', 'studio', 'all', null)).entries.map((e) => e.name)).toEqual(['Rob']);
+    await social.adminBlock(b, false);
+    const handler = createAdminHandler(social, 'k', clock.now, {}, lb);
+    const call = async (method: string, url: string) => {
+      let body = '';
+      const res: any = { writeHead: () => undefined, end: (x: string) => (body = x) };
+      await handler({ method, url, headers: { 'x-admin-key': 'k' }, on: () => undefined } as any, res, '1.1.1.1');
+      return body ? JSON.parse(body) : null;
+    };
+    const list = await call('GET', '/api/admin/scores?env=studio');
+    const mia = list.scores.find((x: any) => x.names === 'Mia');
+    expect(mia.kind).toBe('solo');
+    await call('POST', `/api/admin/scores/${mia.id}/hide`);
+    expect((await lb.view('solo', 'studio', 'all', null)).entries.map((e) => e.name)).toEqual(['Rob']);
+    await call('DELETE', `/api/admin/scores/${mia.id}`);
+    await social.deleteMe(a);
+    expect(await db.all("SELECT id FROM scores WHERE kind = 'solo'")).toHaveLength(0);
+  });
+
+  it('the HTTP endpoint needs a device token, validates input and is rate limited per player', async () => {
+    const { lb, social, reg } = await setup();
+    const r = await social.register('Rob', '7.7.7.7');
+    if (!r.ok) throw new Error('reg');
+    const handler = createLeaderboardHandler(lb, social);
+    const post = async (body: unknown, token: string | null = r.token) => {
+      let status = 0;
+      let out = '';
+      const res: any = { writeHead: (s: number) => (status = s), end: (x: string) => (out = x) };
+      const listeners: Record<string, (a?: Buffer) => void> = {};
+      const req: any = { method: 'POST', url: '/api/leaderboard/solo', headers: token ? { 'x-dd-token': token } : {}, on: (e: string, f: (a?: Buffer) => void) => (listeners[e] = f) };
+      const done = handler(req, res, '8.8.8.8');
+      await new Promise((x) => setTimeout(x, 5));
+      listeners.data?.(Buffer.from(JSON.stringify(body)));
+      listeners.end?.();
+      await done;
+      return { status, json: out ? JSON.parse(out) : null };
+    };
+    expect((await post({ level: 'f0', score: 100, time: 80 }, null)).status).toBe(401);
+    expect((await post({ level: 'f0', score: 100, time: 80 }, 'f'.repeat(48))).status).toBe(401);
+    expect((await post({ nonsense: 1 })).status).toBe(400);
+    const good = await post({ level: 'f0', score: 2500, time: 80 });
+    expect(good).toMatchObject({ status: 200, json: { status: 'ok', rank: { week: 1 } } });
+    expect((await post({ level: 'f0', score: 2500000, time: 80 })).json).toEqual({ status: 'unexpected' });
+    for (let i = 0; i < 3; i++) await post({ level: 'f0', score: 100, time: 80 });
+    await post({ level: 'f0', score: 100, time: 80 });
+    await post({ level: 'f0', score: 100, time: 80 });
+    expect((await post({ level: 'f0', score: 100, time: 80 })).status).toBe(429);
+    void reg;
   });
 });

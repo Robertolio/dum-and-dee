@@ -2,7 +2,7 @@ import type { Screens } from './screens';
 import { sfx } from '../audio/sfx';
 import { loadIdentity } from '../social/identity';
 
-type Kind = 'duo' | 'player';
+type Kind = 'duo' | 'player' | 'solo';
 type Range = 'week' | 'all';
 
 interface Entry {
@@ -110,7 +110,7 @@ export class LeaderboardUI {
       }
       return row;
     };
-    const top = tabs([['duo', 'Duos'], ['player', 'Players']], this.kind, 'lb-kind', (x) => (this.kind = x as Kind));
+    const top = tabs([['duo', 'Duos'], ['player', 'Players'], ['solo', 'Solo']], this.kind, 'lb-kind', (x) => (this.kind = x as Kind));
     top.append(...tabs([['week', 'This week'], ['all', 'All time']], this.range, 'lb-range', (x) => (this.range = x as Range)).children);
     card.append(top);
     const envs = el('div', 'ctl');
@@ -151,7 +151,7 @@ export class LeaderboardUI {
       list.append(empty);
     } else list.append(el('p', 'sub', note));
     card.append(list);
-    card.append(el('p', 'sub', 'Only online two-player runs count. Names are shown without any search.'));
+    card.append(el('p', 'sub', this.kind === 'solo' ? 'Solo runs are sent by your device and checked for plausibility. You need a name (Play with a friend) to take part.' : 'Only online two-player runs count in Duos and Players. Names are shown without any search.'));
     this.root.replaceChildren(card);
     this.root.classList.remove('hidden');
   }

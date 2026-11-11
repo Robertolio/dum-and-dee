@@ -153,3 +153,4 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 
 - Plausibility limits (`plausible` in `packages/social/src/leaderboard.ts`): 800 points per second plus 3000, 9 we/s maximum average speed. They are generous on purpose; they only stop absurd values. Tighten them once real runs show the normal range.
 - Cache 15 s and 60 reads per minute per IP for the read API.
+- Revised the plausibility limits to be per environment (400 points per second, Endless 300, plus 3000, max 9 we/s average) and shared by the Solo list and the online lists. Solo submissions: 6 per minute per player, 20 per minute per IP.

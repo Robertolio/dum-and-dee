@@ -3,6 +3,7 @@ import type { GameScene } from '../scenes/GameScene';
 import { sfx } from '../audio/sfx';
 import { loadProgress, recordEndless, recordLevel } from '../progress';
 import { keepScreenOn } from '../platform/wakelock';
+import { submitSolo } from '../net/solo';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -274,6 +275,17 @@ export class Screens {
       if (def.endless) recordEndless(def.id, s.distance, Math.floor(s.score));
       card.append(el('h2', '', 'Game over'), el('p', 'big', `Score ${Math.floor(s.score)}`));
       card.append(el('p', '', def.endless ? `Distance ${s.distance} m · Best combo ${s.bestCombo}` : `${def.name} · Best combo ${s.bestCombo}`));
+    }
+    const eligible = (kind === 'complete' && !!s.result) || def.endless;
+    if (eligible) {
+      const rank = el('p', 'big');
+      rank.dataset.testid = 'solo-rank';
+      card.append(rank);
+      const score = kind === 'complete' && s.result ? s.result.score : Math.floor(s.score);
+      void submitSolo({ level: def.id, score, time: s.time, distance: s.distance }).then((o) => {
+        if (o.status === 'unexpected') rank.textContent = 'Unexpected score (not on the leaderboard)';
+        else if (o.status === 'ok' && o.rank) rank.textContent = `You are #${o.rank.week} this week (#${o.rank.all} all time)`;
+      });
     }
     const row = el('div', 'buttons');
     if (next) {

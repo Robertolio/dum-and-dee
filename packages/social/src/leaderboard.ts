@@ -9,7 +9,7 @@ import type { Social } from './service';
 export const LB_ENVS = ['factory', 'studio', 'boathouse', 'rowing', 'endless'] as const;
 export type LbEnv = (typeof LB_ENVS)[number];
 export type LbFilter = LbEnv | 'overall';
-export type LbKind = 'duo' | 'player';
+export type LbKind = 'duo' | 'player' | 'solo';
 export type LbRange = 'week' | 'all';
 
 const TZ = 'Europe/Amsterdam';
@@ -70,16 +70,31 @@ interface Full {
   list: Array<{ ent: string; ids: string[]; name: string; score: number; rank: number }>;
 }
 
-const MAX_SCORE_PER_SECOND = 800;
-const MAX_SPEED = 9;
+/** Most points per second a run can plausibly earn (score includes combos and bonuses; real runs are around 100/s), per environment. */
+export const MAX_SCORE_PER_SECOND: Record<LbEnv, number> = { factory: 400, studio: 400, boathouse: 400, rowing: 400, endless: 300 };
+/** Constant on top of the per-second limit for the finish bonuses. */
+export const SCORE_SLACK = 3000;
+/** Nobody averages more than this many world units per second over a level. */
+export const MAX_SPEED = 9;
+export const MIN_SECONDS = 5;
+export const MAX_SECONDS = 3 * 3600;
 
-/** Pure plausibility check for a finished run: not faster than anyone can run, and a score that fits the time played. */
+export const envOf = (level: string): LbEnv | null => {
+  const def = levelById(level);
+  if (def.id !== level) return null;
+  return def.endless ? 'endless' : (def.theme as LbEnv);
+};
+
+/** Plausibility of a finished run: played at least as long as the level takes at top speed, and points that fit the time played. */
 export function plausible(run: Pick<RunInput, 'level' | 'score' | 'ticks' | 'distance'>): boolean {
+  const env = envOf(run.level);
+  if (!env) return false;
   const def = levelById(run.level);
   const seconds = run.ticks / 60;
-  if (!Number.isFinite(run.score) || run.score < 0 || run.score > 2_000_000 || seconds < 5) return false;
-  if (def.endless) return run.distance <= seconds * MAX_SPEED + 30 && run.score <= seconds * MAX_SCORE_PER_SECOND + 3000;
-  return def.data.length / MAX_SPEED <= seconds && run.score <= seconds * MAX_SCORE_PER_SECOND + 3000;
+  if (![run.score, run.ticks, run.distance].every(Number.isFinite) || run.score < 0 || run.distance < 0 || seconds < MIN_SECONDS || seconds > MAX_SECONDS) return false;
+  if (run.score > seconds * MAX_SCORE_PER_SECOND[env] + SCORE_SLACK) return false;
+  if (def.endless) return run.distance <= seconds * MAX_SPEED + 30;
+  return def.data.length / MAX_SPEED <= seconds;
 }
 
 export interface LbOptions {
@@ -87,17 +102,23 @@ export interface LbOptions {
   randomBytes: RandomBytes;
   cacheMs?: number;
   readsPerMinutePerIp?: number;
+  submitsPerMinutePerPlayer?: number;
+  submitsPerMinutePerIp?: number;
 }
 
 /** Scores of server-authoritative online runs only. Duos and players, this week and all time, per environment. */
 export class Leaderboard {
   private readonly cache = new Map<string, { at: number; full: Full }>();
   private readonly readLimit: RateLimiter;
+  private readonly submitLimit: RateLimiter;
+  private readonly submitIpLimit: RateLimiter;
   private readonly o: Required<LbOptions>;
 
   constructor(readonly db: Db, readonly social: Social, opts: LbOptions) {
-    this.o = { cacheMs: 15_000, readsPerMinutePerIp: 60, ...opts };
+    this.o = { cacheMs: 15_000, readsPerMinutePerIp: 60, submitsPerMinutePerPlayer: 6, submitsPerMinutePerIp: 20, ...opts };
     this.readLimit = new RateLimiter(this.o.readsPerMinutePerIp, 60_000, opts.now);
+    this.submitLimit = new RateLimiter(this.o.submitsPerMinutePerPlayer, 60_000, opts.now);
+    this.submitIpLimit = new RateLimiter(this.o.submitsPerMinutePerIp, 60_000, opts.now);
   }
 
   allow(ip: string): boolean {
@@ -112,9 +133,8 @@ export class Leaderboard {
 
   /** Stores one run: a duo row when both players are identified, and one row per identified player. */
   async record(run: RunInput): Promise<Ranks | null> {
-    const def = levelById(run.level);
-    const env: LbEnv = def.endless ? 'endless' : (def.theme as LbEnv);
-    if (!LB_ENVS.includes(env) || !plausible(run)) return null;
+    const env = envOf(run.level);
+    if (!env || !plausible(run)) return null;
     const known = async (id: string | null): Promise<string | null> => {
       const p = id ? await this.social.player(id) : undefined;
       return p && !p.blocked ? p.id : null;
@@ -136,6 +156,41 @@ export class Leaderboard {
     for (const id of new Set([a, b])) if (id) await put('player', id, '');
     this.invalidate();
     return this.ranksFor(env, score, a, b);
+  }
+
+  /**
+   * A solo run, sent by the client. It goes in its own kind ('solo') and never mixes with the server-authoritative lists.
+   * An implausible score is stored flagged (hidden = 2): not on the board, but visible to the admin API.
+   */
+  async submitSolo(id: string, run: { level: string; score: number; time: number; distance: number }): Promise<{ status: 'ok'; env: LbEnv; score: number; rank: { week: number; all: number } | null } | { status: 'unexpected' } | { status: 'rejected' }> {
+    const env = envOf(run.level);
+    const p = await this.social.player(id);
+    if (!env || !p || p.blocked || !Number.isFinite(run.score) || !Number.isFinite(run.time)) return { status: 'rejected' };
+    const score = Math.round(run.score);
+    const ok = plausible({ level: run.level, score, ticks: run.time * 60, distance: run.distance });
+    const now = this.o.now();
+    await this.db.run('INSERT INTO scores (id, kind, p1, p2, env, level, score, time_ms, created, week, hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+      randomId(12, this.o.randomBytes),
+      'solo',
+      id,
+      '',
+      env,
+      run.level,
+      Math.max(0, Math.min(2_000_000_000, score)),
+      Math.round(Math.max(0, Math.min(1e7, run.time)) * 1000),
+      now,
+      weekStart(now),
+      ok ? 0 : 2,
+    ]);
+    if (!ok) return { status: 'unexpected' };
+    this.invalidate();
+    const w = (await this.full('solo', env, 'week')).list.find((e) => e.ent === id);
+    const l = (await this.full('solo', env, 'all')).list.find((e) => e.ent === id);
+    return { status: 'ok', env, score, rank: w && l ? { week: w.rank, all: l.rank } : null };
+  }
+
+  submitAllowed(id: string, ip: string): boolean {
+    return this.submitLimit.hit(`p:${id}`) && this.submitIpLimit.hit(`ip:${ip}`);
   }
 
   async ranksFor(env: LbEnv, score: number, a: string | null, b: string | null): Promise<Ranks> {
@@ -250,18 +305,55 @@ const json = (res: ServerResponse, status: number, body: unknown, cache = 'no-st
   res.end(JSON.stringify(body));
 };
 
-/** GET /api/leaderboard?kind=duo|player&env=overall|factory|...&range=week|all. The optional x-dd-token header marks "you" and friends. */
+const readJson = (req: IncomingMessage): Promise<Record<string, unknown> | null> =>
+  new Promise((resolve) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > 1024) {
+        req.destroy();
+        resolve(null);
+      } else chunks.push(c);
+    });
+    req.on('end', () => {
+      try {
+        const v: unknown = JSON.parse(Buffer.concat(chunks).toString() || 'null');
+        resolve(typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : null);
+      } catch {
+        resolve(null);
+      }
+    });
+    req.on('error', () => resolve(null));
+  });
+
+/**
+ * GET /api/leaderboard?kind=duo|player|solo&env=overall|factory|...&range=week|all (optional x-dd-token marks your rows).
+ * POST /api/leaderboard/solo {level, score, time, distance} with x-dd-token: a client-played run for the Solo list.
+ */
 export function createLeaderboardHandler(lb: Leaderboard, social: Social) {
   return async (req: IncomingMessage, res: ServerResponse, ip: string): Promise<boolean> => {
     const url = new URL(req.url ?? '/', 'http://x');
+    const token = req.headers['x-dd-token'];
+    if (url.pathname === '/api/leaderboard/solo') {
+      if (req.method !== 'POST') return json(res, 405, { error: 'method' }), true;
+      const p = typeof token === 'string' ? await social.authenticate(token) : null;
+      if (!p) return json(res, 401, { error: 'unauthorized' }), true;
+      if (!lb.submitAllowed(p.id, ip)) return json(res, 429, { error: 'rate_limited' }), true;
+      const b = await readJson(req);
+      const num = (v: unknown): number => (typeof v === 'number' ? v : NaN);
+      if (!b || typeof b.level !== 'string') return json(res, 400, { error: 'bad_request' }), true;
+      const r = await lb.submitSolo(p.id, { level: b.level, score: num(b.score), time: num(b.time), distance: Number.isFinite(num(b.distance)) ? num(b.distance) : 0 });
+      return json(res, r.status === 'rejected' ? 400 : 200, r), true;
+    }
     if (url.pathname !== '/api/leaderboard') return false;
     if (req.method !== 'GET') return json(res, 405, { error: 'method' }), true;
     if (!lb.allow(ip)) return json(res, 429, { error: 'rate_limited' }), true;
-    const kind = url.searchParams.get('kind') === 'player' ? 'player' : 'duo';
+    const k = url.searchParams.get('kind');
+    const kind: LbKind = k === 'player' ? 'player' : k === 'solo' ? 'solo' : 'duo';
     const e = url.searchParams.get('env') ?? 'overall';
     const env: LbFilter = e === 'overall' || (LB_ENVS as readonly string[]).includes(e) ? (e as LbFilter) : 'overall';
     const range: LbRange = url.searchParams.get('range') === 'all' ? 'all' : 'week';
-    const token = req.headers['x-dd-token'];
     const p = typeof token === 'string' ? await social.authenticate(token) : null;
     json(res, 200, await lb.view(kind, env, range, p?.id ?? null), p ? 'no-store' : 'public, max-age=10');
     return true;

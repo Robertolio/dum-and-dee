@@ -202,7 +202,7 @@ Friend-code lookups: 10 per minute per device and per IP. Registrations: 8 per h
 
 ## Leaderboard
 
-What counts: only **online two-player runs** that the server itself simulated. Solo runs never count (the client could send anything; there is no honest way to verify them). The client never submits a score. At the end of a run `RoomManager.onRunEnd` hands `{level, score, ticks, players}` to the `Leaderboard`. The players are the identities that authenticated on the game socket (`auth` with the device token); anonymous seats are not recorded. A duo row needs both seats identified; each identified player also gets an individual row.
+What counts in Duos and Players: only **online two-player runs** that the server itself simulated; the client never submits those. Client-played solo runs have their own separate **Solo** list (see below) and never mix with Duos/Players. At the end of a run `RoomManager.onRunEnd` hands `{level, score, ticks, players}` to the `Leaderboard`. The players are the identities that authenticated on the game socket (`auth` with the device token); anonymous seats are not recorded. A duo row needs both seats identified; each identified player also gets an individual row.
 
 - Scores: a completed level counts with its `result.score`; Endless counts at game over. A game over in a campaign level is not recorded.
 - Duos are listed as `<A> & <B>` (names sorted, built from the two current names). Players get the **duo score of the run credited to each of the two** (the sim has no per-player score, so that is the fairest honest number). Nothing but names and scores leaves the server (no ids).
@@ -214,3 +214,11 @@ What counts: only **online two-player runs** that the server itself simulated. S
 - Admin (header `x-admin-key`, same as the player admin): `GET /api/admin/scores?limit=&env=`, `POST /api/admin/scores/:id/hide|unhide`, `DELETE /api/admin/scores/:id`. Hiding a player entirely is the existing block.
 - After a run each identified player gets a `{t:'lb', env, score, duo:{week,all}, player:{week,all}}` message on the game socket; the result screen shows "You are #12 this week".
 - UI: "Leaderboard" on the home menu and in the ☰ menu; Back returns to where it was opened from.
+
+### Solo list
+
+- `POST /api/leaderboard/solo` with header `x-dd-token` (device identity; no token or an unknown one gives 401, anonymous devices never submit) and body `{level, score, time, distance}`. `time` is the sim time of the run in seconds, `distance` matters for Endless. Rate limit: 6 per minute per player and 20 per minute per IP (429).
+- Stored as `kind = 'solo'` (`p1` = player id) in the same `scores` table, so the same week, environment, Overall, friends mark, profanity and block filtering, Delete me and admin hide/delete apply. Solo rows are never read into the duo or player lists and the other way round.
+- Plausibility (`plausible`, used for both solo and online runs): at least 5 s and at most 3 h played; the level must take at least `length / 9` s (nobody averages more than 9 we/s); Endless distance at most `9 * seconds + 30`; score at most `seconds * k + 3000` with k = 400 for Meat factory, TV studio, Boathouse and Rowing race and 300 for Endless (real runs earn around 100 per second). Unknown level ids are rejected (400).
+- A dubious solo score is stored flagged (`hidden = 2`): it is not on the board, the admin `GET /api/admin/scores` shows it (`hidden: 2`) and `POST /api/admin/scores/:id/unhide` would show it. The client gets `{status: 'unexpected'}` and the end screen shows "Unexpected score (not on the leaderboard)" instead of the rank. A good run answers `{status: 'ok', rank: {week, all}}` and the end screen shows "You are #N this week (#M all time)".
+- Honest limits: a solo score is client-reported, so a cheater who stays inside the limits cannot be told apart from a good player. That is why the solo list is separate.
