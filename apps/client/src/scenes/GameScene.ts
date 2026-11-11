@@ -49,6 +49,7 @@ export class GameScene extends Phaser.Scene {
   online: ClientSync | null = null;
   private curTheme: Theme = 'factory';
   private gateText: Phaser.GameObjects.Text | null = null;
+  private gateLogo: Phaser.GameObjects.Image | null = null;
   private bannerText: Phaser.GameObjects.Text | null = null;
   tuning: Tuning = cloneTuning(DEFAULT_TUNING);
   controller!: Controller;
@@ -102,6 +103,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
+    this.load.image('asyntis', 'art/asyntis.png');
     this.load.svg('wall', 'art/wall.svg', { width: 512, height: 400 });
     this.load.svg('pipes', 'art/pipes.svg', { width: 512, height: 400 });
     this.load.svg('floor', 'art/floor.svg', { width: 256, height: 100 });
@@ -352,7 +354,11 @@ export class GameScene extends Phaser.Scene {
     this.view.camX = this.targetCamX();
   }
 
+  /** Set by the online layer: while it returns true the server alone decides which level is played. */
+  levelLock: (() => boolean) | null = null;
+
   startLevel(def: LevelDef): void {
+    if (this.levelLock?.()) return;
     this.levelDef = def;
     this.paused = false;
     this.curTheme = themeAtX(!!def.data.mixed, def.theme, 0);
@@ -1098,7 +1104,7 @@ export class GameScene extends Phaser.Scene {
     if (d.mixed) {
       const z0 = Math.max(1, Math.floor(this.view.camX / MIXED_ZONE));
       for (let z = z0; z <= z0 + 1; z++) out.push({ x: z * MIXED_ZONE, to: z % 2 === 1 ? 'studio' : 'factory' });
-    } else {
+    } else if (this.levelDef.theme !== 'rowing') {
       const nx = nextLevel(this.levelDef.id);
       if (nx && nx.theme !== this.levelDef.theme && d.length < 1e8) out.push({ x: d.length - 1, to: nx.theme });
     }
@@ -1107,23 +1113,30 @@ export class GameScene extends Phaser.Scene {
 
   private drawGates(): void {
     const g = this.gProps;
-    let label: { sx: number; text: string } | null = null;
+    let label: { sx: number; text: string; logo: boolean } | null = null;
+    const logoSign = this.levelDef.theme === 'boathouse' && !this.levelDef.data.mixed;
     for (const gate of this.gates()) {
       const sx = this.view.sx(gate.x);
       if (sx < -200 || sx > this.scale.width + 200) continue;
-      const col = gate.to === 'studio' ? 0xb03a5c : gate.to === 'boathouse' ? 0x2a6ebb : 0xd8a62a;
+      const col = gate.to === 'studio' ? 0xb03a5c : gate.to === 'boathouse' ? 0x2a6ebb : gate.to === 'rowing' ? 0x2a9d8f : 0xd8a62a;
       g.fillStyle(0x2b2f36);
       g.fillRect(sx - 90, FLOOR_Y - 250, 22, 250);
       g.fillRect(sx + 68, FLOOR_Y - 250, 22, 250);
-      g.fillStyle(col);
+      g.fillStyle(logoSign ? 0xf6f4ec : col);
       g.fillRect(sx - 100, FLOOR_Y - 290, 200, 46);
       g.fillStyle(0xffffff, 0.12);
       g.fillRect(sx - 68, FLOOR_Y - 244, 136, 244);
-      label = { sx, text: gate.to === 'studio' ? 'TV STUDIO' : gate.to === 'boathouse' ? 'BOATHOUSE' : 'FACTORY' };
+      label = { sx, logo: logoSign, text: logoSign ? 'asyntis' : gate.to === 'studio' ? 'TV STUDIO' : gate.to === 'boathouse' ? 'BOATHOUSE' : gate.to === 'rowing' ? 'ROWING RACE' : 'MEAT FACTORY' };
     }
     if (!this.gateText) this.gateText = this.add.text(0, 0, '', { fontFamily: 'sans-serif', fontSize: '24px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(7);
-    this.gateText.setVisible(!!label);
+    const hasLogo = this.textures.exists('asyntis');
+    if (!this.gateLogo && hasLogo) this.gateLogo = this.add.image(0, 0, 'asyntis').setDepth(7);
+    const showLogo = !!label?.logo && hasLogo;
+    this.gateText.setVisible(!!label && !showLogo);
+    this.gateText.setColor(label?.logo ? '#111111' : '#ffffff');
+    this.gateLogo?.setVisible(showLogo);
     if (label) this.gateText.setText(label.text).setPosition(label.sx, FLOOR_Y - 267);
+    if (label && this.gateLogo) this.gateLogo.setScale(Math.min(176 / this.gateLogo.width, 36 / this.gateLogo.height)).setPosition(label.sx, FLOOR_Y - 267);
   }
 
   private applyTheme(clear = true): void {

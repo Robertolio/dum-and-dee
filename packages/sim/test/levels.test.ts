@@ -16,7 +16,7 @@ describe('level loader', () => {
       expect(s.steps.length + s.lamps.length + s.softs.length + (s.row ? s.row.ducks.length + s.row.buoys.length : 0)).toBeGreaterThan(5);
       expect(again.steps.map((o) => o.x0)).toEqual(s.steps.map((o) => o.x0));
       expect(s.levelLength).toBe(l.data.length);
-      const secs = l.data.length / 2.4;
+      const secs = l.data.length / (l.data.rowing ? 3.2 : 2.4);
       expect(secs).toBeGreaterThan(45);
       expect(secs).toBeLessThan(135);
     }
@@ -34,5 +34,17 @@ describe('level loader', () => {
       const steps = [...s.steps].sort((a, b) => a.x0 - b.x0);
       for (let i = 1; i < steps.length; i++) expect(steps[i]!.x0).toBeGreaterThanOrEqual(steps[i - 1]!.x1 - 1e-6);
     }
+  });
+});
+
+describe('campaign order', () => {
+  it('alternates Meat factory, TV studio, Boathouse, Rowing race in three rounds, with unique ids and Endless outside it', async () => {
+    const { CAMPAIGN, EXTRA_LEVELS } = await import('../src/index');
+    expect(CAMPAIGN.map((l) => l.theme)).toEqual(['factory', 'studio', 'boathouse', 'rowing', 'factory', 'studio', 'boathouse', 'rowing', 'factory', 'studio', 'boathouse', 'rowing']);
+    expect(CAMPAIGN.map((l) => l.name.replace(/ \d$/, ''))).toEqual(['Meat factory', 'TV studio', 'Boathouse', 'Rowing race', 'Meat factory', 'TV studio', 'Boathouse', 'Rowing race', 'Meat factory', 'TV studio', 'Boathouse', 'Rowing race']);
+    const ids = [...CAMPAIGN, ...EXTRA_LEVELS].map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual(expect.arrayContaining(['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 's1', 's2', 's3', 's4', 's5', 'b1', 'r1']));
+    expect(CAMPAIGN.some((l) => l.endless)).toBe(false);
   });
 });

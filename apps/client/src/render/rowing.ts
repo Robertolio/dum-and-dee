@@ -681,13 +681,13 @@ export class RowingView {
   /** Cyclist on the towpath: appears now and then and shouts a hint through a megaphone. */
   private updateCyclist(g: Phaser.GameObjects.Graphics, gf: Phaser.GameObjects.Graphics, s: GameState, view: View, W: number, dt: number, now: number): void {
     const r = s.row!;
-    if (!this.cyclist && r.started && !s.finished && now > this.nextCyclist) {
-      const text = this.pickHint(s, now);
-      if (text) this.cyclist = { x: -80, text, said: false, sayAt: W * (0.18 + Math.random() * 0.2), talk: 0, phase: 0 };
+    if (!this.cyclist && r.started && !s.finished) {
+      const text = this.pickHazard(s) ?? (now > this.nextCyclist ? this.pickHint(s, now) : null);
+      if (text) this.cyclist = { x: -40, text, said: false, sayAt: W * (0.1 + Math.random() * 0.12), talk: 0, phase: 0 };
     }
     const c = this.cyclist;
     if (!c) return;
-    c.x += (200 + Math.max(0, r.v) * 30) * dt;
+    c.x += (260 + Math.max(0, r.v) * 30) * dt;
     c.phase += dt * 9;
     if (!c.said && c.x >= c.sayAt) {
       c.said = true;
@@ -758,22 +758,29 @@ export class RowingView {
     void view;
   }
 
-  private pickHint(s: GameState, now: number): string | null {
+  /** Bridges and ducks get their own warning well ahead, independent of the cyclist cooldown. */
+  private pickHazard(s: GameState): string | null {
     const r = s.row!;
+    for (const b of r.bridges) {
+      const ahead = b.x0 - r.x;
+      if (!b.done && ahead > 7 && ahead < 25 && !this.hinted.has(`b${b.x0}`)) {
+        this.hinted.add(`b${b.x0}`);
+        if (r.v < 2.4) return 'Faster! Bridge ahead!';
+        return b.kind === 'low' || b.kind === 'wood' ? 'Bridge! Not too high!' : 'Bridge ahead!';
+      }
+    }
     for (const d of r.ducks) {
       const ahead = d.x - r.x;
-      if (!d.done && ahead > 5 && ahead < 18 && !this.hinted.has(`d${d.x}`)) {
+      if (!d.done && ahead > 7 && ahead < 22 && !this.hinted.has(`d${d.x}`)) {
         this.hinted.add(`d${d.x}`);
         return 'Duck!';
       }
     }
-    for (const b of r.bridges) {
-      const ahead = b.x0 - r.x;
-      if (!b.done && ahead > 6 && ahead < 22 && !this.hinted.has(`b${b.x0}`)) {
-        this.hinted.add(`b${b.x0}`);
-        return b.kind === 'low' || b.kind === 'wood' ? 'Bridge! Not too high!' : 'Bridge!';
-      }
-    }
+    return null;
+  }
+
+  private pickHint(s: GameState, now: number): string | null {
+    const r = s.row!;
     if (r.sync < 0.45 && now - this.lastSyncHint > 14) {
       this.lastSyncHint = now;
       return 'Together!';

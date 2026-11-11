@@ -2,7 +2,7 @@ import type { GameScene } from '../scenes/GameScene';
 import type { Screens } from './screens';
 import type { OnlineUI } from './online';
 import type { FriendsUI } from './friends';
-import { CAMPAIGN, levelById } from '@dd/sim';
+import { CAMPAIGN, LEVELS, levelById } from '@dd/sim';
 import { toggleFullscreen } from '../platform/fullscreen';
 import { initialControls } from '../platform/controls';
 import { inviteFromUrl } from '../social/identity';
@@ -21,7 +21,7 @@ export function mountStartScreen(scene: GameScene, screens: Screens, online?: On
     scene.controller.setSettings(initialControls());
     scene.refreshHints();
     void toggleFullscreen();
-    const jump = CAMPAIGN.find((l) => l.id === q.get('level'));
+    const jump = LEVELS.find((l) => l.id === q.get('level'));
     if (jump) {
       screens.start(jump);
       return;

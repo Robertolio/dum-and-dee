@@ -42,6 +42,9 @@ export class Coach {
   private shownFor = 0;
   private progress = 0;
   private gap = 1.2;
+  /** The oar-lift hint is shown for the first two bridges. */
+  private liftShown = 0;
+  private coachedBridge = -1;
 
   constructor() {
     this.el.className = 'coach hidden';
@@ -84,17 +87,19 @@ export class Coach {
   updateRow(dt: number, inputs: [PlayerInput, PlayerInput], cfg: ControlSettings, s: GameState): void {
     const r = s.row;
     if (!r || s.finished || s.gameOver) return this.hide();
+    if (s.tick < 5) this.coachedBridge = -1;
     const pending = ROW_ORDER.filter((m) => !this.done.has(m));
     if (pending.length === 0) return this.hide();
     const ahead = (xs: number[], max: number): boolean => xs.some((x) => x - r.x > 1 && x - r.x < max);
     const due = (m: Mark): boolean =>
-      m === 'row' ? s.tick > 20 : m === 'lift' ? ahead(r.bridges.filter((b) => !b.done).map((b) => b.x0), 16) : ahead(r.ducks.filter((d) => !d.done).map((d) => d.x), 11);
+      m === 'row' ? s.tick > 20 : m === 'lift' ? ahead(r.bridges.filter((b) => !b.done && b.x0 > this.coachedBridge).map((b) => b.x0), 24) : ahead(r.ducks.filter((d) => !d.done).map((d) => d.x), 18);
     if (!this.current) {
       const next = pending.find((m) => due(m));
       if (!next) return;
       this.current = next;
       this.shownFor = 0;
       this.progress = 0;
+      if (next === 'lift') this.coachedBridge = r.bridges.filter((b) => !b.done && b.x0 > r.x).reduce((m, b) => Math.min(m, b.x0), Infinity);
       let text = TEXT[cfg.source === 'keyboard' ? 'keyboard' : 'touch'][next];
       if (next === 'lift' && cfg.source === 'touch' && cfg.posture === 'digital') text = 'Bridge! Let go of the screen to lift the oars out of the water.';
       this.el.textContent = text;
@@ -106,13 +111,18 @@ export class Coach {
     const lifted = r.rowers.some((w) => w.lift > 0.3 && w.lift < 0.9);
     const finished =
       (m === 'row' && r.strokes[0] >= 3 && r.strokes[1] >= 3) ||
-      (m === 'lift' && (lifted || !ahead(r.bridges.filter((b) => !b.done).map((b) => b.x0), 16))) ||
-      (m === 'duck' && (jumped || !ahead(r.ducks.filter((d) => !d.done).map((d) => d.x), 11)));
+      (m === 'lift' && (lifted || r.x > this.coachedBridge)) ||
+      (m === 'duck' && (jumped || !ahead(r.ducks.filter((d) => !d.done).map((d) => d.x), 18)));
     if (finished || this.shownFor > 14) this.finish();
   }
 
   private finish(): void {
     if (!this.current) return;
+    if (this.current === 'lift' && ++this.liftShown < 2) {
+      this.hide();
+      this.gap = 1.5;
+      return;
+    }
     this.done.add(this.current);
     try {
       localStorage.setItem(KEY, JSON.stringify([...this.done]));

@@ -27,6 +27,13 @@ export const ROW = {
   bow: 2.5,
   /** Minimum speed to pop a buoy. */
   popSpeed: 2.3,
+  /** Duck: half-width of the hit zone, minimum jump height that clears it, and jump duration (s). */
+  duckZone: 0.45,
+  duckClear: 0.12,
+  jumpTime: 0.85,
+  /** Bridge glide: drag is multiplied by this from `glideBefore` we ahead of a bridge until its end. */
+  glide: 0.25,
+  glideBefore: 3,
   hullClash: 3,
   hullDuck: 8,
   hullBridge: 8,
@@ -137,7 +144,8 @@ export function integrateRowing(s: GameState, inputs: readonly [PlayerInput, Pla
     }
   }
   r.v += thrust;
-  r.v -= (ROW.drag * r.v + ROW.dragQuad * r.v * Math.abs(r.v)) * dt;
+  const gliding = r.bridges.some((b) => r.x > b.x0 - ROW.glideBefore && r.x < b.x1);
+  r.v -= (ROW.drag * r.v + ROW.dragQuad * r.v * Math.abs(r.v)) * dt * (gliding ? ROW.glide : 1);
   r.v = Math.max(-2.5, r.v);
 
   r.rollVel += (drive[0]! - drive[1]!) * 7 + (r.rowers[1].a - r.rowers[0].a) * 0.2 * dt;
@@ -158,11 +166,11 @@ export function integrateRowing(s: GameState, inputs: readonly [PlayerInput, Pla
   if (jumpReq && r.jumpT <= 0) r.jumpT = dt;
   if (r.jumpT > 0) {
     r.jumpT += dt;
-    if (r.jumpT >= t.jumpTime) {
+    if (r.jumpT >= ROW.jumpTime) {
       r.jumpT = 0;
       r.jumpY = 0;
     } else {
-      const u = r.jumpT / t.jumpTime;
+      const u = r.jumpT / ROW.jumpTime;
       r.jumpY = t.jumpHeight * 4 * u * (1 - u);
     }
   }
@@ -173,12 +181,12 @@ export function integrateRowing(s: GameState, inputs: readonly [PlayerInput, Pla
   for (const d of r.ducks) {
     if (d.done) continue;
     const rel = d.x - r.x;
-    if (Math.abs(rel) < 0.6 && r.jumpY < 0.2) {
+    if (Math.abs(rel) < ROW.duckZone && r.jumpY < ROW.duckClear) {
       d.done = true;
       r.v *= 0.5;
       s.bucket.water -= ROW.hullDuck;
       at('duckHit', { x: d.x, value: 0 });
-    } else if (rel < -0.6) {
+    } else if (rel < -ROW.duckZone) {
       d.done = true;
       s.score += ROW.scoreDuck * s.comboMult;
       at('duckJump', { x: d.x, value: ROW.scoreDuck * s.comboMult });

@@ -139,3 +139,12 @@ Unlock happens on touchend / pointerup / click / keydown (capture phase), not on
 - Sounds (WebAudio, procedural): `gunshot`, `buoyBang`, `horn` (finish), `quack`, `oarDip` (blade enters the water), `oarClash`, `megaphone`; splash and bonk are reused.
 - Coach-marks: `row` (stroke), `lift` (bridge ahead), `duck` (duck ahead), shown once each when the situation arises (`Coach.updateRow`).
 - Not tuned: balance (course length 300 we, spacing, ceilings, thrust and pop speed), keyboard feel, touch swipe feel on a real phone, online feel.
+
+## Rowing easier (LD-19) and campaign by environment (LD-20)
+
+- Bridge glide: drag x0.25 from 3 we before a bridge to its end (`ROW.glide`, `ROW.glideBefore`). A bot test enters every bridge at 3 we/s with no rowing and must pass.
+- Bridges shortened (low 5, wood 6, arch 8, stone 9). Duck zone 0.6 -> 0.45, clear height 0.2 -> 0.12, jump 0.85 s.
+- Bridge and duck warnings come from the cyclist 22-25 we ahead, ignoring the cooldown; cyclist spawns closer and faster; 'Faster! Bridge ahead!' when slow; the oar-lift coach mark repeats for the first two bridges.
+- Campaign: f0, s1, b1, r1, f3, s3, b2, r2, f5, s5, b3, r3 (ids unchanged, so dd-progress needs no migration). f1, f2, f4, s2, s4 are extra levels in the Levels list. r2/r3 are generated courses with clearance rules checked by tests.
+- Online: the server owns the level. Either player may switch (last wins); a switch during play restarts for both; completing a level advances the room to the next one.
+- Boathouse end sign: Asyntis logo from `apps/client/public/art/asyntis.png` (text fallback until the file exists). Rowing has no end gate.

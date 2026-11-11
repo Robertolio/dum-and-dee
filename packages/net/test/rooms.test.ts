@@ -79,8 +79,8 @@ describe('rooms', () => {
     const c = client('3.3.3.3');
     c.send({ t: 'join', room: code });
     expect(c.c.last('err')!.code).toBe('room_full');
-    b.send({ t: 'level', id: 'endless' });
-    expect(b.c.last('err')!.code).toBe('not_host');
+    b.send({ t: 'level', id: 'nope' });
+    expect(b.c.last('err')!.code).toBe('bad_level');
     a.send({ t: 'level', id: 'endless' });
     expect(a.c.last('room')!.level).toBe('endless');
     a.send({ t: 'ready', ready: true });
@@ -91,6 +91,34 @@ describe('rooms', () => {
     expect(a.c.last('start')!.level).toBe('endless');
     expect(b.c.last('start')).toBeDefined();
     expect(a.c.last('room')!.phase).toBe('play');
+  });
+
+  it('either player may switch the level; the server sends it to both, last switch wins', () => {
+    const { client } = setup();
+    const a = client();
+    a.send({ t: 'create', v: 1 });
+    const b = client('2.2.2.2');
+    b.send({ t: 'join', room: a.c.last('joined')!.room });
+    b.send({ t: 'level', id: 'r1' });
+    expect(a.c.last('room')!.level).toBe('r1');
+    expect(b.c.last('room')!.level).toBe('r1');
+    expect(a.c.last('room')!.lvlBy).toBe(1);
+    a.send({ t: 'level', id: 'f0' });
+    expect(a.c.last('room')!.level).toBe('f0');
+    expect(b.c.last('room')!.level).toBe('f0');
+    expect(b.c.last('room')!.lvlSeq).toBe(2);
+    expect(b.c.last('room')!.lvlBy).toBe(0);
+  });
+
+  it('a level switch during play restarts that level for both; completing a level moves the room on', () => {
+    const { a, b, advance } = started();
+    a.send({ t: 'level', id: 'b1' });
+    expect(a.c.last('start')!.level).toBe('b1');
+    expect(b.c.last('start')!.level).toBe('b1');
+    expect(b.c.last('room')!.phase).toBe('play');
+    b.send({ t: 'level', id: 'r1' });
+    expect(a.c.last('start')!.level).toBe('r1');
+    void advance;
   });
 
   it('unreadying during the countdown cancels it', () => {

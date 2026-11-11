@@ -88,9 +88,9 @@ describe('TV studio', () => {
     expect(LEVELS.filter((l) => l.endless).length).toBe(1);
   });
 
-  it('the campaign runs from the factory straight into the studio', () => {
+  it('the campaign starts in the factory and goes on to the studio', () => {
     expect(CAMPAIGN[0]!.id).toBe('f0');
-    expect(nextLevel('f5')!.id).toBe('s1');
+    expect(nextLevel('f0')!.id).toBe('s1');
     expect(nextLevel(CAMPAIGN[CAMPAIGN.length - 1]!.id)).toBeUndefined();
   });
 

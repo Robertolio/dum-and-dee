@@ -1,4 +1,4 @@
-import { levelById, LEVELS } from '@dd/sim';
+import { levelById, LEVELS, nextLevel } from '@dd/sim';
 import { ServerGame, encode } from './game';
 import {
   CODE_ALPHABET,
@@ -47,6 +47,9 @@ interface Room {
   code: string;
   phase: Phase;
   level: string;
+  /** Counts level switches; `lvlBy` is the seat that made the last one. Both go out with every room message. */
+  lvlSeq: number;
+  lvlBy: Seat | null;
   host: Seat;
   members: [Member | null, Member | null];
   game: ServerGame | null;
@@ -229,13 +232,17 @@ export class RoomManager {
       case 'ctl':
         me.ctl = msg.mode;
         return this.broadcastRoom(room);
-      case 'level':
-        if (room.phase !== 'lobby') return this.sendErr(ctx, 'not_lobby');
-        if (me.seat !== room.host) return this.sendErr(ctx, 'not_host');
+      case 'level': {
         if (!VALID_LEVELS.has(msg.id)) return this.sendErr(ctx, 'bad_level');
+        if (room.phase === 'paused') return this.sendErr(ctx, 'paused');
+        if (msg.id === room.level) return;
         room.level = msg.id;
-        for (const m of room.members) if (m) m.ready = false;
-        return this.broadcastRoom(room);
+        room.lvlSeq++;
+        room.lvlBy = me.seat;
+        if (room.phase === 'play') this.begin(room, now);
+        else this.broadcastRoom(room);
+        return;
+      }
       case 'ready': {
         if (room.phase !== 'lobby' && room.phase !== 'countdown') return;
         me.ready = msg.ready;
@@ -260,7 +267,7 @@ export class RoomManager {
       code = '';
     }
     if (!code) return this.sendErr(ctx, 'server_full');
-    const room: Room = { code, phase: 'lobby', level: 'f0', host: 0, members: [null, null], game: null, countAt: 0, pauseUntil: 0, lastActive: now };
+    const room: Room = { code, phase: 'lobby', level: 'f0', lvlSeq: 0, lvlBy: null, host: 0, members: [null, null], game: null, countAt: 0, pauseUntil: 0, lastActive: now };
     this.rooms.set(code, room);
     const me = this.seatIn(room, 0, ctx);
     this.sendJoined(ctx, room, me);
@@ -342,6 +349,10 @@ export class RoomManager {
     const g = room.game;
     if (!g) return;
     const s = g.state;
+    if (s.finished) {
+      const nx = nextLevel(room.level);
+      if (nx) room.level = nx.id;
+    }
     this.broadcast(room, encode({ t: 'end', kind: s.finished ? 'complete' : 'gameover', result: s.result, score: Math.floor(s.score), distance: s.distance } satisfies ServerMsg));
     this.toLobby(room);
     this.broadcastRoom(room);
@@ -405,6 +416,8 @@ export class RoomManager {
         room: room.code,
         phase: room.phase,
         level: room.level,
+        lvlSeq: room.lvlSeq,
+        ...(room.lvlBy !== null ? { lvlBy: room.lvlBy } : {}),
         host: room.host,
         you: m.seat,
         seats: [this.info(room.members[0]), this.info(room.members[1])],

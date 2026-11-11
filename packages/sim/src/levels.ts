@@ -105,7 +105,9 @@ const endless: LevelDef = {
  * 6 pennants, 7 hanging vests, 8 puddle trail, 9 lamp pair, 11 prop + vest/pennant).
  */
 const boathouse: LevelDef[] = [
-  { id: 'b1', name: 'Boathouse', blurb: 'Carry the skiff to the water', seed: 131, gap: 9, items: [[0, 0.2, 'Now entering: the boathouse. Carry the skiff gently'], [7, 0.2, 'Sweep the hanging vests away'], [1, 0.25], [8, 0.3, 'Puddles make you slip!'], [2, 0.35, 'Hanging oars swing: time it'], [3, 0.4, 'Steps ahead: duck under the beam'], [5, 0.45], [6, 0.45], [4, 0.5], [9, 0.5], [2, 0.55], [3, 0.6], [11, 0.6], [8, 0.65], [5, 0.7], [2, 0.7], [4, 0.75], [3, 0.8, 'Almost at the water!'], [0, 0.8]] },
+  { id: 'b1', name: 'Boathouse 1', blurb: 'Carry the skiff to the water', seed: 131, gap: 9, items: [[0, 0.2, 'Now entering: the boathouse. Carry the skiff gently'], [7, 0.2, 'Sweep the hanging vests away'], [1, 0.25], [8, 0.3, 'Puddles make you slip!'], [2, 0.35, 'Hanging oars swing: time it'], [3, 0.4, 'Steps ahead: duck under the beam'], [5, 0.45], [6, 0.45], [4, 0.5], [9, 0.5], [2, 0.55], [3, 0.6], [11, 0.6], [8, 0.65], [5, 0.7], [2, 0.7], [4, 0.75], [3, 0.8, 'Almost at the water!'], [0, 0.8]] },
+  { id: 'b2', name: 'Boathouse 2', blurb: 'Busier: oars, vests and puddles', seed: 141, gap: 8.5, items: [[0, 0.3, 'Back in the boathouse, and it is busier'], [7, 0.35], [8, 0.4], [2, 0.45], [3, 0.5], [5, 0.55], [9, 0.55], [4, 0.6], [11, 0.6], [2, 0.65], [8, 0.7], [3, 0.7], [6, 0.75], [5, 0.8], [2, 0.85], [4, 0.85], [3, 0.9], [0, 0.9]] },
+  { id: 'b3', name: 'Boathouse 3', blurb: 'Race day: everything at once', seed: 151, gap: 8, items: [[2, 0.55], [8, 0.6], [3, 0.65], [9, 0.65], [4, 0.7], [2, 0.75], [7, 0.75], [8, 0.8], [3, 0.8], [11, 0.85], [5, 0.85], [2, 0.9], [9, 0.9], [3, 0.95], [8, 0.95], [4, 1], [2, 1], [3, 1], [11, 1], [8, 1]] },
 ].map((l) => ({
   id: l.id,
   name: l.name,
@@ -119,10 +121,52 @@ const boathouse: LevelDef[] = [
  * Rowing race: Dum and Dee row the skiff down the canal. The level is a fixed course of ducks (jump),
  * buoys (hit them fast) and four kinds of bridges (oars up, but not too high).
  */
+type Bridge = { x0: number; x1: number; kind: 'low' | 'arch' | 'wood' | 'stone' };
+
+/**
+ * Fills a course between the given bridges with alternating ducks and buoys every `spacing` we (deterministic).
+ * Ducks keep 9 we before and 4 after a bridge, buoys 6 before and 6 after, ducks 8 apart, and a duck 5 from any buoy.
+ */
+function rowingCourse(length: number, bridges: Bridge[], spacing: number, first: number): { ducks: number[]; buoys: number[]; bridges: Bridge[] } {
+  const ducks: number[] = [];
+  const buoys: number[] = [];
+  let n = 0;
+  for (let x = first; x < length - 14; x += spacing + (n % 3) * 2, n++) {
+    const wantDuck = n % 2 === 0;
+    const clear = (before: number, after: number): boolean => bridges.every((b) => x < b.x0 - before || x > b.x1 + after);
+    if (wantDuck && clear(9, 4) && ducks.every((d) => Math.abs(d - x) >= 8) && buoys.every((u) => Math.abs(u - x) >= 5)) ducks.push(x);
+    else if (!wantDuck && clear(6, 6) && ducks.every((d) => Math.abs(d - x) >= 5) && buoys.every((u) => Math.abs(u - x) >= 8)) buoys.push(x);
+  }
+  return { ducks, buoys, bridges };
+}
+
+const r1Bridges: Bridge[] = [
+  { x0: 85, x1: 90, kind: 'low' },
+  { x0: 131, x1: 139, kind: 'arch' },
+  { x0: 188, x1: 194, kind: 'wood' },
+  { x0: 240, x1: 249, kind: 'stone' },
+];
+const r2Bridges: Bridge[] = [
+  { x0: 70, x1: 76, kind: 'wood' },
+  { x0: 118, x1: 127, kind: 'stone' },
+  { x0: 172, x1: 177, kind: 'low' },
+  { x0: 226, x1: 234, kind: 'arch' },
+  { x0: 282, x1: 287, kind: 'low' },
+];
+const r3Bridges: Bridge[] = [
+  { x0: 60, x1: 65, kind: 'low' },
+  { x0: 108, x1: 116, kind: 'arch' },
+  { x0: 150, x1: 156, kind: 'wood' },
+  { x0: 196, x1: 205, kind: 'stone' },
+  { x0: 240, x1: 245, kind: 'low' },
+  { x0: 284, x1: 292, kind: 'arch' },
+  { x0: 330, x1: 336, kind: 'wood' },
+];
+
 const rowing: LevelDef[] = [
   {
     id: 'r1',
-    name: 'Rowing race',
+    name: 'Rowing race 1',
     theme: 'rowing',
     endless: false,
     blurb: 'Row together down the canal',
@@ -135,26 +179,67 @@ const rowing: LevelDef[] = [
       steps: [],
       rowing: {
         ducks: [34, 66, 104, 150, 160, 208, 222, 270, 282],
-        buoys: [50, 98, 118, 156, 176, 214, 262, 291],
-        bridges: [
-          { x0: 82, x1: 90, kind: 'low' },
-          { x0: 128, x1: 142, kind: 'arch' },
-          { x0: 186, x1: 196, kind: 'wood' },
-          { x0: 236, x1: 252, kind: 'stone' },
-        ],
+        buoys: [50, 98, 118, 155, 176, 214, 262, 291],
+        bridges: r1Bridges,
       },
       hints: [
         { x: 30, text: 'Ducks! Jump over them' },
         { x: 46, text: 'Hit the buoys fast to pop them' },
-        { x: 76, text: 'Bridge: lift the oars, not too high' },
+        { x: 72, text: 'Bridge: lift the oars, not too high' },
       ],
     },
   },
+  {
+    id: 'r2',
+    name: 'Rowing race 2',
+    theme: 'rowing',
+    endless: false,
+    blurb: 'Five bridges and more ducks',
+    data: { id: 'r2', theme: 'rowing', length: 340, par: 115, lamps: [], steps: [], rowing: rowingCourse(340, r2Bridges, 20, 30), hints: [{ x: 24, text: 'More bridges this time' }] },
+  },
+  {
+    id: 'r3',
+    name: 'Rowing race 3',
+    theme: 'rowing',
+    endless: false,
+    blurb: 'Seven bridges, no rest',
+    data: { id: 'r3', theme: 'rowing', length: 380, par: 130, lamps: [], steps: [], rowing: rowingCourse(380, r3Bridges, 16, 26), hints: [{ x: 20, text: 'The long canal: seven bridges' }] },
+  },
 ];
 
-/** The campaign, in play order: factory levels, the TV studio, the boathouse, then the rowing race. */
-export const CAMPAIGN: LevelDef[] = [...factory, ...studio, ...boathouse, ...rowing];
-export const LEVELS: LevelDef[] = [...CAMPAIGN, endless];
+const byId = (id: string): LevelDef => [...factory, ...studio, ...boathouse, ...rowing].find((l) => l.id === id)!;
+
+/** Display names: "<environment> <n>" with the old name as the blurb prefix. */
+const rename = (id: string, name: string): LevelDef => {
+  const l = byId(id);
+  if (!l.blurb.startsWith(l.name + ': ') && !/ \d$/.test(l.name)) l.blurb = `${l.name}: ${l.blurb}`;
+  l.name = name;
+  return l;
+};
+
+/**
+ * The campaign alternates environments: Meat factory, TV studio, Boathouse, Rowing race, three rounds with rising difficulty.
+ * Level ids are unchanged, so saved progress (keyed by id) keeps working.
+ */
+export const CAMPAIGN: LevelDef[] = [
+  rename('f0', 'Meat factory 1'),
+  rename('s1', 'TV studio 1'),
+  byId('b1'),
+  byId('r1'),
+  rename('f3', 'Meat factory 2'),
+  rename('s3', 'TV studio 2'),
+  byId('b2'),
+  byId('r2'),
+  rename('f5', 'Meat factory 3'),
+  rename('s5', 'TV studio 3'),
+  byId('b3'),
+  byId('r3'),
+];
+
+/** Levels that are not part of the chain any more; still playable from the Levels list and with ?level=. */
+export const EXTRA_LEVELS: LevelDef[] = ['f1', 'f2', 'f4', 's2', 's4'].map(byId);
+
+export const LEVELS: LevelDef[] = [...CAMPAIGN, ...EXTRA_LEVELS, endless];
 
 export function nextLevel(id: string): LevelDef | undefined {
   const i = CAMPAIGN.findIndex((l) => l.id === id);

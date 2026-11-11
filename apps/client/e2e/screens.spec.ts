@@ -45,7 +45,7 @@ test.describe('Menu, level select, game over and level complete', () => {
     await page.reload();
     await page.waitForFunction(() => (window as any).__dd !== undefined);
     await expect(page.getByTestId('btn-play')).toContainText('Continue');
-    await expect(page.getByTestId('btn-play')).toContainText('Butcher aisle');
+    await expect(page.getByTestId('btn-play')).toContainText('TV studio 1');
     await page.getByTestId('menu-button').click();
     await page.getByTestId('btn-endless').click();
     await page.waitForFunction(() => (window as any).__dd.getState().tick > 20);

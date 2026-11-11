@@ -13,6 +13,8 @@ export interface RoomView {
   code: string;
   phase: 'lobby' | 'countdown' | 'play' | 'paused';
   level: string;
+  lvlSeq: number;
+  lvlBy: Seat | null;
   host: Seat;
   you: Seat;
   seats: [SeatInfo | null, SeatInfo | null];
@@ -301,7 +303,7 @@ export class OnlineClient {
       case 'room': {
         this.level = m.level;
         this.seat = m.you;
-        this.room = { code: m.room, phase: m.phase, level: m.level, host: m.host, you: m.you, seats: m.seats };
+        this.room = { code: m.room, phase: m.phase, level: m.level, lvlSeq: m.lvlSeq ?? 0, lvlBy: m.lvlBy ?? null, host: m.host, you: m.you, seats: m.seats };
         this.lastRoomPhase = m.phase;
         if (m.phase === 'lobby' && this.sync) this.sync = null;
         if (m.phase === 'play' && !this.sync) this.ensureSync();

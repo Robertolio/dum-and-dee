@@ -1,4 +1,4 @@
-import { CAMPAIGN, levelById, nextLevel, type LevelDef } from '@dd/sim';
+import { CAMPAIGN, EXTRA_LEVELS, levelById, nextLevel, type LevelDef } from '@dd/sim';
 import type { GameScene } from '../scenes/GameScene';
 import { sfx } from '../audio/sfx';
 import { loadProgress, recordEndless, recordLevel } from '../progress';
@@ -10,6 +10,14 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
   if (text) e.textContent = text;
   return e;
 }
+
+/** Environment shortcuts of the ☰ menu and the Levels screen. */
+export const ENVS: Array<[LevelDef['theme'], string, string]> = [
+  ['factory', 'Meat Factory', 'factory'],
+  ['studio', 'TV Studio', 'tvstudio'],
+  ['boathouse', 'Boathouse', 'boathouse'],
+  ['rowing', 'Rowing race', 'rowing'],
+];
 
 function starsText(n: number): string {
   return '★'.repeat(n) + '☆'.repeat(3 - n);
@@ -72,7 +80,11 @@ export class Screens {
     this.scene.paused = false;
   }
 
+  /** Online play: the server decides the level, so a local choice is handed over instead of started. */
+  levelHook: ((def: LevelDef) => boolean) | null = null;
+
   start(def: LevelDef): void {
+    if (this.levelHook?.(def)) return;
     sfx.unlock();
     keepScreenOn();
     this.hideAll();
@@ -83,6 +95,13 @@ export class Screens {
     const p = loadProgress();
     const open = CAMPAIGN.find((l) => !p.levels[l.id]);
     return open ?? CAMPAIGN[CAMPAIGN.length - 1]!;
+  }
+
+  /** The level the shortcut for an environment starts: its first unplayed campaign level, else its first. */
+  envLevel(theme: LevelDef['theme']): LevelDef {
+    const p = loadProgress();
+    const inEnv = CAMPAIGN.filter((l) => l.theme === theme);
+    return inEnv.find((l) => !p.levels[l.id]) ?? inEnv[0]!;
   }
 
   showMenu(levels = false): void {
@@ -96,27 +115,17 @@ export class Screens {
     const running = this.scene.state.tick > 0 && !this.scene.state.gameOver && !this.scene.state.finished;
     if (levels) {
       card.append(el('h2', '', 'Levels'));
-      const tv = el('button', 'primary', 'TV Studio');
-      tv.dataset.testid = 'btn-tvstudio';
-      tv.addEventListener('click', () => {
-        sfx.click();
-        this.start(levelById('s1'));
-      });
-      const bh = el('button', 'primary', 'Boathouse');
-      bh.dataset.testid = 'btn-boathouse';
-      bh.addEventListener('click', () => {
-        sfx.click();
-        this.start(levelById('b1'));
-      });
-      const rw = el('button', 'primary', 'Rowing race');
-      rw.dataset.testid = 'btn-rowing';
-      rw.addEventListener('click', () => {
-        sfx.click();
-        this.start(levelById('r1'));
-      });
-      card.append(tv, bh, rw);
+      for (const [theme, label, id] of ENVS) {
+        const b = el('button', 'primary', label);
+        b.dataset.testid = `btn-${id}`;
+        b.addEventListener('click', () => {
+          sfx.click();
+          this.start(this.envLevel(theme));
+        });
+        card.append(b);
+      }
       const row = el('div', 'levels');
-      for (const d of CAMPAIGN) {
+      for (const d of [...CAMPAIGN, ...EXTRA_LEVELS]) {
         const b = el('button', 'level');
         b.dataset.testid = `level-${d.id}`;
         const rec = p.levels[d.id];
@@ -209,9 +218,7 @@ export class Screens {
     };
     if (running) add('Resume', 'panel-resume', () => this.hideAll(), 'primary');
     add('∞ Endless', 'btn-endless', () => this.start(levelById('endless')));
-    add('TV Studio', 'panel-tvstudio', () => this.start(levelById('s1')));
-    add('Boathouse', 'panel-boathouse', () => this.start(levelById('b1')));
-    add('Rowing race', 'panel-rowing', () => this.start(levelById('r1')));
+    for (const [theme, label, id] of ENVS) add(label, `panel-${id}`, () => this.start(this.envLevel(theme)));
     add('Levels', 'btn-levels', () => this.showMenu(true));
     add('Friends', 'btn-friends', () => {
       const v = this.view;
@@ -256,7 +263,7 @@ export class Screens {
     }
     const row = el('div', 'buttons');
     if (next) {
-      const nb = el('button', 'primary', next.theme !== def.theme ? `Next: ${next.name} (${next.theme === 'rowing' ? 'Rowing' : next.theme === 'boathouse' ? 'Boathouse' : 'TV Studio'})` : 'Next level');
+      const nb = el('button', 'primary', `Next: ${next.name}`);
       nb.dataset.testid = 'btn-next';
       nb.addEventListener('click', () => {
         sfx.click();

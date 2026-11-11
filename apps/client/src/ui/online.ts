@@ -1,7 +1,7 @@
-import { CAMPAIGN, levelById, type LevelDef } from '@dd/sim';
+import { CAMPAIGN, EXTRA_LEVELS, levelById, nextLevel, type LevelDef } from '@dd/sim';
 import { normalizeCode, type EndMsg, type Seat } from '@dd/net';
 import type { GameScene } from '../scenes/GameScene';
-import type { Screens } from './screens';
+import { ENVS, type Screens } from './screens';
 import type { FriendView } from '../net/social';
 import { OnlineClient, type OnlineEvent, type RoomView } from '../net/online';
 import { sfx } from '../audio/sfx';
@@ -47,7 +47,10 @@ export class OnlineUI {
   private pauseUntil = 0;
   private inGame = false;
   private error = '';
-  private lastLevelSent = '';
+  private lastSeq: number | null = null;
+  private readonly toastEl = el('div', 'toast hidden');
+  private toastTimer = 0;
+  private showAllLevels = false;
   private setupSent = false;
   private autoReady = true;
   private partnerName = '';
@@ -60,7 +63,14 @@ export class OnlineUI {
     this.root.dataset.testid = 'online-screen';
     this.overlay.id = 'online-overlay';
     this.badge.dataset.testid = 'net-badge';
-    document.body.append(this.root, this.overlay, this.badge);
+    this.toastEl.dataset.testid = 'online-toast';
+    document.body.append(this.root, this.overlay, this.badge, this.toastEl);
+    screens.levelHook = (def) => {
+      if (!this.active) return false;
+      this.client.setLevel(def.id);
+      return true;
+    };
+    scene.levelLock = () => this.active;
     this.client.on((e) => this.onEvent(e));
     screens.menuHook = () => this.onMenuButton();
     document.addEventListener('visibilitychange', () => {
@@ -145,6 +155,7 @@ export class OnlineUI {
         if (this.room?.phase === 'lobby') this.renderLobby();
         break;
       case 'room':
+        this.noteLevelSwitch(e.room);
         this.room = e.room;
         if (this.inviteAfterCreate && e.room.phase === 'lobby') {
           this.client.invite(this.inviteAfterCreate.id);
@@ -199,7 +210,41 @@ export class OnlineUI {
   private showLeaveDialog(): void {
     this.overlay.replaceChildren();
     const card = el('div', 'card');
-    card.append(el('h2', '', 'Leave the game?'), el('p', 'sub', 'Your partner will be told that you left.'));
+    card.style.maxHeight = '88vh';
+    card.style.overflowY = 'auto';
+    const cur = this.room ? levelById(this.room.level).name : '';
+    card.append(el('h2', '', 'Online game'), el('p', 'sub', `Playing: ${cur}. Switching changes the level for both of you.`));
+    const pick = (def: LevelDef): void => {
+      sfx.click();
+      this.overlay.classList.add('hidden');
+      this.client.setLevel(def.id);
+    };
+    const envs = el('div', 'buttons');
+    for (const [theme, label, id] of ENVS) {
+      const b = tid(el('button', '', label), `online-switch-${id}`);
+      b.addEventListener('click', () => pick(this.screens.envLevel(theme)));
+      envs.append(b);
+    }
+    const endless = tid(el('button', '', '∞ Endless'), 'online-switch-endless');
+    endless.addEventListener('click', () => pick(levelById('endless')));
+    envs.append(endless);
+    card.append(envs);
+    const more = tid(el('button', 'link', this.showAllLevels ? 'Hide levels' : 'All levels'), 'online-levels-toggle');
+    more.addEventListener('click', () => {
+      this.showAllLevels = !this.showAllLevels;
+      this.showLeaveDialog();
+    });
+    card.append(more);
+    if (this.showAllLevels) {
+      const list = el('div', 'levels');
+      for (const d of [...CAMPAIGN, ...EXTRA_LEVELS]) {
+        const b = tid(el('button', 'level'), `online-level-${d.id}`);
+        b.append(el('b', '', d.name), el('small', '', d.blurb));
+        b.addEventListener('click', () => pick(d));
+        list.append(b);
+      }
+      card.append(list);
+    }
     const row = el('div', 'buttons');
     const stay = tid(el('button', 'primary', 'Stay'), 'online-stay');
     stay.addEventListener('click', () => this.overlay.classList.add('hidden'));
@@ -235,7 +280,7 @@ export class OnlineUI {
   private resetFlow(): void {
     this.setupSent = false;
     this.autoReady = true;
-    this.lastLevelSent = '';
+    this.lastSeq = null;
     clearInterval(this.countTimer);
   }
 
@@ -243,7 +288,7 @@ export class OnlineUI {
     if (!this.setupSent) {
       this.setupSent = true;
       this.client.setCtl(this.scene.controller.settings().posture);
-      if (r.you === r.host) this.sendLevel();
+      if (r.you === r.host && r.lvlSeq === 0) this.client.setLevel(this.screens.continueDef().id);
     }
     if (this.autoReady && both && r.phase === 'lobby' && !r.seats[r.you]?.ready) this.client.setReady(true);
   }
@@ -311,12 +356,17 @@ export class OnlineUI {
     return box;
   }
 
-  private sendLevel(): void {
-    const id = this.screens.continueDef().id;
-    this.lastLevelSent = id;
-    this.client.setLevel(id);
+  /** The server decides the level; the partner who did not switch gets a short notice. */
+  private noteLevelSwitch(r: RoomView): void {
+    const first = this.lastSeq === null;
+    const changed = !first && r.lvlSeq !== this.lastSeq;
+    this.lastSeq = r.lvlSeq;
+    if (!changed || r.lvlBy === r.you) return;
+    this.toastEl.textContent = `Switched to ${levelById(r.level).name}`;
+    this.toastEl.classList.remove('hidden');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => this.toastEl.classList.add('hidden'), 3000);
   }
-
 
   // ---- countdown / game ----
 
@@ -344,7 +394,6 @@ export class OnlineUI {
     this.resultBox = null;
     this.screens.hideAll();
     this.scene.startOnline(def, sync);
-    this.lastLevelSent = '';
     this.setupSent = true;
     this.updateBadge();
   }
@@ -386,7 +435,8 @@ export class OnlineUI {
       card.append(el('h2', '', 'Game over'), el('p', 'big', `Score ${end.score}`), el('p', '', `Distance ${end.distance} m`));
     }
     this.autoReady = false;
-    const back = tid(el('button', 'primary', 'Play again'), 'online-result-back');
+    const nx = end.kind === 'complete' ? nextLevel(def.id) : undefined;
+    const back = tid(el('button', 'primary', nx ? `Next: ${nx.name}` : 'Play again'), 'online-result-back');
     back.addEventListener('click', () => {
       sfx.unlock();
       sfx.click();
@@ -395,7 +445,6 @@ export class OnlineUI {
       this.inGame = false;
       this.badge.classList.add('hidden');
       this.autoReady = true;
-      this.sendLevel();
       this.client.setReady(true);
       if (this.room) this.renderLobby();
     });

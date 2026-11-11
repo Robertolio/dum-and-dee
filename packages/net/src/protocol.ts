@@ -60,7 +60,7 @@ export interface EndMsg {
 export type ServerMsg =
   | { t: 'hello'; v: number; ms: number }
   | { t: 'joined'; room: string; token: string; seat: Seat; host: Seat }
-  | { t: 'room'; room: string; phase: Phase; level: string; host: Seat; you: Seat; seats: [SeatInfo | null, SeatInfo | null]; pauseUntil?: number }
+  | { t: 'room'; room: string; phase: Phase; level: string; lvlSeq?: number; lvlBy?: Seat; host: Seat; you: Seat; seats: [SeatInfo | null, SeatInfo | null]; pauseUntil?: number }
   | { t: 'count'; at: number }
   | { t: 'start'; level: string; at: number }
   | SnapMsg
