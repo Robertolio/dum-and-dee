@@ -66,6 +66,26 @@ export class SocialClient {
     else this.open();
   }
 
+  /** Register a name and resolve when the server confirmed it (null) or with an error code. */
+  registerAsync(name: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (v: string | null): void => {
+        if (done) return;
+        done = true;
+        off();
+        clearTimeout(t);
+        resolve(v);
+      };
+      const off = this.on((e) => {
+        if (e.type === 'me') finish(null);
+        else if (e.type === 'error') finish(e.code);
+      });
+      const t = window.setTimeout(() => finish('connect_failed'), 10_000);
+      this.register(name);
+    });
+  }
+
   /** Send now when signed in, otherwise right after the first `me`. */
   sendWhenReady(m: object): void {
     if (this.me) this.send(m);

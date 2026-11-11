@@ -62,6 +62,17 @@ game.events.once(Phaser.Core.Events.READY, () => {
     settingsUI.friendsOpen = () => friends.isOpen();
     settingsUI.openFriendsSettings = () => friends.showSettings();
     new LeaderboardUI(screens);
+    const NAME_ERRORS: Record<string, string> = {
+      name_length: 'Pick a name of 2 to 16 characters.',
+      name_chars: 'Use letters, numbers and spaces only.',
+      name_profane: 'Please pick a friendlier name.',
+      rate_limited: 'Too many tries. Wait a minute.',
+      connect_failed: 'Could not reach the game server.',
+    };
+    screens.registerName = async (name) => {
+      const e = await social.registerAsync(name.trim());
+      return e ? (NAME_ERRORS[e] ?? 'Could not save the name.') : null;
+    };
     mountStartScreen(scene, screens, online, friends);
   };
   if (scene.scene.isActive()) mount();

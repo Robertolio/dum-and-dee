@@ -3,7 +3,8 @@ import type { GameScene } from '../scenes/GameScene';
 import { sfx } from '../audio/sfx';
 import { loadProgress, recordEndless, recordLevel } from '../progress';
 import { keepScreenOn } from '../platform/wakelock';
-import { submitSolo } from '../net/solo';
+import { describeSolo, submitSolo, type SoloOutcome } from '../net/solo';
+import { loadIdentity } from '../social/identity';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -106,7 +107,62 @@ export class Screens {
     return inEnv.find((l) => !p.levels[l.id]) ?? inEnv[0]!;
   }
 
+  /** Set by main: registers a name with the server; resolves to an error text or null. */
+  registerName: ((name: string) => Promise<string | null>) | null = null;
+  /** Last answer of the server about a solo score; shown on the leaderboard screen. */
+  soloNote = '';
+  private readonly sentScores = new WeakMap<object, number>();
+
+  /** Sends the current solo run once per score (finished, game over, or left early). */
+  async submitRun(partial: boolean): Promise<SoloOutcome | null> {
+    const s = this.scene.state;
+    const def = this.scene.levelDef;
+    const score = s.finished && s.result ? s.result.score : Math.floor(s.score);
+    if (score <= 0 || this.scene.online || (this.sentScores.get(s) ?? 0) >= score) return null;
+    this.sentScores.set(s, score);
+    const o = await submitSolo({ level: def.id, score, time: s.time, distance: s.distance, partial: partial || !s.finished });
+    if (o.status === 'error') this.sentScores.delete(s);
+    this.soloNote = `${def.name}: ${describeSolo(o)}`;
+    return o;
+  }
+
+  /** Called when a menu opens in the middle of a solo run: the best score so far counts too. */
+  private flushRun(): void {
+    const s = this.scene.state;
+    if (s.tick > 0 && !s.gameOver && !s.finished && loadIdentity()) void this.submitRun(true);
+  }
+
+  private nameForm(rank: HTMLElement, then: () => void): HTMLElement {
+    const box = el('div', 'nameform');
+    const input = el('input');
+    input.dataset.testid = 'solo-name';
+    input.maxLength = 16;
+    input.placeholder = 'Your name for the leaderboard';
+    input.autocomplete = 'off';
+    const go = el('button', 'primary', 'Save');
+    go.dataset.testid = 'solo-name-save';
+    const err = el('p', 'sub');
+    err.dataset.testid = 'solo-name-error';
+    go.addEventListener('click', () => {
+      sfx.click();
+      go.disabled = true;
+      err.textContent = '';
+      void (this.registerName?.(input.value) ?? Promise.resolve('Could not save the name.')).then((e) => {
+        go.disabled = false;
+        if (e) err.textContent = e;
+        else {
+          box.remove();
+          then();
+        }
+      });
+    });
+    box.append(input, go, err);
+    rank.textContent = '';
+    return box;
+  }
+
   showMenu(levels = false): void {
+    this.flushRun();
     this.view = levels ? 'levels' : 'home';
     keepScreenOn();
     const p = loadProgress();
@@ -209,6 +265,7 @@ export class Screens {
 
   /** The ☰ menu: everything that is not "Play" or "Play with a friend". */
   showPanel(): void {
+    this.flushRun();
     this.view = 'panel';
     keepScreenOn();
     this.scene.paused = true;
@@ -276,16 +333,19 @@ export class Screens {
       card.append(el('h2', '', 'Game over'), el('p', 'big', `Score ${Math.floor(s.score)}`));
       card.append(el('p', '', def.endless ? `Distance ${s.distance} m · Best combo ${s.bestCombo}` : `${def.name} · Best combo ${s.bestCombo}`));
     }
-    const eligible = (kind === 'complete' && !!s.result) || def.endless;
-    if (eligible) {
+    const sent = kind === 'complete' && s.result ? s.result.score : Math.floor(s.score);
+    if (sent > 0 && !this.scene.online) {
       const rank = el('p', 'big');
       rank.dataset.testid = 'solo-rank';
       card.append(rank);
-      const score = kind === 'complete' && s.result ? s.result.score : Math.floor(s.score);
-      void submitSolo({ level: def.id, score, time: s.time, distance: s.distance }).then((o) => {
-        if (o.status === 'unexpected') rank.textContent = 'Unexpected score (not on the leaderboard)';
-        else if (o.status === 'ok' && o.rank) rank.textContent = `You are #${o.rank.week} this week (#${o.rank.all} all time)`;
-      });
+      const send = (): void => {
+        rank.textContent = 'Sending your score…';
+        void this.submitRun(false).then((o) => {
+          rank.textContent = o ? describeSolo(o) : '';
+        });
+      };
+      if (loadIdentity()) send();
+      else card.append(this.nameForm(rank, send));
     }
     const row = el('div', 'buttons');
     if (next) {

@@ -291,3 +291,32 @@ describe('solo list', () => {
     void reg;
   });
 });
+
+describe('totals: sum of the best score per level', () => {
+  it('adds the best of every level over all environments, counts levels, and Endless is one more level', async () => {
+    const { lb, reg } = await setup();
+    const a = await reg('Rob', '1.1.1.1');
+    const b = await reg('Mia', '2.2.2.2');
+    const s = (level: string, score: number, time = 80) => ({ level, score, time, distance: level === 'endless' ? 300 : 0 });
+    await lb.submitSolo(a, s('f0', 1000));
+    await lb.submitSolo(a, s('f0', 1500));
+    await lb.submitSolo(a, s('f1', 700));
+    await lb.submitSolo(a, s('r1', 1828, 295));
+    await lb.submitSolo(a, s('endless', 400));
+    await lb.submitSolo(b, s('f0', 900));
+    const v = await lb.view('solo', 'overall', 'all', a);
+    expect(v.entries.map((e) => [e.name, e.score, e.levels])).toEqual([['Rob', 1500 + 700 + 1828 + 400, 4], ['Mia', 900, 1]]);
+    await lb.record(run('f0', 2000, a, b));
+    await lb.record(run('f0', 2200, a, b));
+    await lb.record(run('s1', 1000, a, b));
+    const duo = await lb.view('duo', 'overall', 'all', a);
+    expect(duo.entries.map((e) => [e.name, e.score, e.levels])).toEqual([['Mia & Rob', 3200, 2]]);
+  });
+
+  it('a Rowing race solo run of 1828 points in 4:55 is accepted', async () => {
+    const { lb, reg } = await setup();
+    const a = await reg('Rob');
+    expect(await lb.submitSolo(a, { level: 'r1', score: 1828, time: 295, distance: 0 })).toMatchObject({ status: 'ok' });
+    for (const id of ['r1', 'r2', 'r3']) expect(plausible({ level: id, score: 1828, ticks: 295 * 60, distance: 0 })).toBe(true);
+  });
+});

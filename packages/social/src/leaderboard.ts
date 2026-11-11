@@ -46,6 +46,8 @@ export interface LbEntry {
   rank: number;
   name: string;
   score: number;
+  /** Number of different levels that count towards the total. */
+  levels: number;
   me: boolean;
   friend: boolean;
 }
@@ -67,7 +69,7 @@ export interface Ranks {
 }
 
 interface Full {
-  list: Array<{ ent: string; ids: string[]; name: string; score: number; rank: number }>;
+  list: Array<{ ent: string; ids: string[]; name: string; score: number; levels: number; rank: number }>;
 }
 
 /** Most points per second a run can plausibly earn (score includes combos and bonuses; real runs are around 100/s), per environment. */
@@ -86,14 +88,14 @@ export const envOf = (level: string): LbEnv | null => {
 };
 
 /** Plausibility of a finished run: played at least as long as the level takes at top speed, and points that fit the time played. */
-export function plausible(run: Pick<RunInput, 'level' | 'score' | 'ticks' | 'distance'>): boolean {
+export function plausible(run: Pick<RunInput, 'level' | 'score' | 'ticks' | 'distance'>, partial = false): boolean {
   const env = envOf(run.level);
   if (!env) return false;
   const def = levelById(run.level);
   const seconds = run.ticks / 60;
   if (![run.score, run.ticks, run.distance].every(Number.isFinite) || run.score < 0 || run.distance < 0 || seconds < MIN_SECONDS || seconds > MAX_SECONDS) return false;
   if (run.score > seconds * MAX_SCORE_PER_SECOND[env] + SCORE_SLACK) return false;
-  if (def.endless) return run.distance <= seconds * MAX_SPEED + 30;
+  if (def.endless || partial) return run.distance <= seconds * MAX_SPEED + 30;
   return def.data.length / MAX_SPEED <= seconds;
 }
 
@@ -106,7 +108,7 @@ export interface LbOptions {
   submitsPerMinutePerIp?: number;
 }
 
-/** Scores of server-authoritative online runs only. Duos and players, this week and all time, per environment. */
+/** Scores of server-authoritative online runs only. Duos, players and solo players: total of the best score per level. */
 export class Leaderboard {
   private readonly cache = new Map<string, { at: number; full: Full }>();
   private readonly readLimit: RateLimiter;
@@ -162,12 +164,12 @@ export class Leaderboard {
    * A solo run, sent by the client. It goes in its own kind ('solo') and never mixes with the server-authoritative lists.
    * An implausible score is stored flagged (hidden = 2): not on the board, but visible to the admin API.
    */
-  async submitSolo(id: string, run: { level: string; score: number; time: number; distance: number }): Promise<{ status: 'ok'; env: LbEnv; score: number; rank: { week: number; all: number } | null } | { status: 'unexpected' } | { status: 'rejected' }> {
+  async submitSolo(id: string, run: { level: string; score: number; time: number; distance: number; partial?: boolean }): Promise<{ status: 'ok'; env: LbEnv; score: number; rank: { week: number; all: number } | null } | { status: 'unexpected' } | { status: 'rejected' }> {
     const env = envOf(run.level);
     const p = await this.social.player(id);
     if (!env || !p || p.blocked || !Number.isFinite(run.score) || !Number.isFinite(run.time)) return { status: 'rejected' };
     const score = Math.round(run.score);
-    const ok = plausible({ level: run.level, score, ticks: run.time * 60, distance: run.distance });
+    const ok = plausible({ level: run.level, score, ticks: run.time * 60, distance: run.distance }, !!run.partial);
     const now = this.o.now();
     await this.db.run('INSERT INTO scores (id, kind, p1, p2, env, level, score, time_ms, created, week, hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
       randomId(12, this.o.randomBytes),
@@ -227,20 +229,24 @@ export class Leaderboard {
       where += ' AND env = ?';
       params.push(env);
     }
-    const rows = await this.db.all<{ p1: string; p2: string; env: string; score: number | string }>(`SELECT p1, p2, env, MAX(score) AS score FROM scores WHERE ${where} GROUP BY p1, p2, env`, params);
-    const sums = new Map<string, number>();
+    // The total of a duo/player is the sum of its best score per level (Endless counts as one level).
+    const rows = await this.db.all<{ p1: string; p2: string; level: string; score: number | string }>(`SELECT p1, p2, level, MAX(score) AS score FROM scores WHERE ${where} GROUP BY p1, p2, level`, params);
+    const sums = new Map<string, { score: number; levels: number }>();
     for (const r of rows) {
       const ent = r.p2 ? `${r.p1}|${r.p2}` : r.p1;
-      sums.set(ent, (sums.get(ent) ?? 0) + Number(r.score));
+      const cur = sums.get(ent) ?? { score: 0, levels: 0 };
+      cur.score += Number(r.score);
+      cur.levels += 1;
+      sums.set(ent, cur);
     }
     const names = new Map<string, string>();
     for (const p of await this.db.all<{ id: string; name: string }>('SELECT id, name FROM players WHERE blocked = 0')) if (!isProfane(p.name)) names.set(p.id, p.name);
     const list: Full['list'] = [];
-    for (const [ent, score] of sums) {
+    for (const [ent, { score, levels }] of sums) {
       const ids = ent.split('|');
       const ns = ids.map((i) => names.get(i));
       if (ns.some((n) => !n)) continue;
-      list.push({ ent, ids, name: ids.length > 1 ? [...(ns as string[])].sort((x, y) => x.localeCompare(y)).join(' & ') : ns[0]!, score, rank: 0 });
+      list.push({ ent, ids, name: ids.length > 1 ? [...(ns as string[])].sort((x, y) => x.localeCompare(y)).join(' & ') : ns[0]!, score, levels, rank: 0 });
     }
     list.sort((x, y) => y.score - x.score || x.name.localeCompare(y.name));
     list.forEach((e, i) => {
@@ -259,6 +265,7 @@ export class Leaderboard {
       rank: e.rank,
       name: e.name,
       score: e.score,
+      levels: e.levels,
       me: !!me && e.ids.includes(me),
       friend: e.ids.some((i) => i !== me && friends.has(i)),
     });
@@ -343,7 +350,8 @@ export function createLeaderboardHandler(lb: Leaderboard, social: Social) {
       const b = await readJson(req);
       const num = (v: unknown): number => (typeof v === 'number' ? v : NaN);
       if (!b || typeof b.level !== 'string') return json(res, 400, { error: 'bad_request' }), true;
-      const r = await lb.submitSolo(p.id, { level: b.level, score: num(b.score), time: num(b.time), distance: Number.isFinite(num(b.distance)) ? num(b.distance) : 0 });
+      const r = await lb.submitSolo(p.id, { level: b.level, score: num(b.score), time: num(b.time), distance: Number.isFinite(num(b.distance)) ? num(b.distance) : 0, partial: b.partial === true });
+      if (r.status !== 'ok') console.warn(`solo score ${r.status}: level=${String(b.level).slice(0, 12)} score=${String(b.score).slice(0, 12)} time=${String(b.time).slice(0, 12)} partial=${b.partial === true} player=${p.id.slice(0, 4)}`);
       return json(res, r.status === 'rejected' ? 400 : 200, r), true;
     }
     if (url.pathname !== '/api/leaderboard') return false;

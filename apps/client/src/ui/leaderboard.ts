@@ -2,13 +2,13 @@ import type { Screens } from './screens';
 import { sfx } from '../audio/sfx';
 import { loadIdentity } from '../social/identity';
 
-type Kind = 'duo' | 'player' | 'solo';
-type Range = 'week' | 'all';
+type Kind = 'duo' | 'solo';
 
 interface Entry {
   rank: number;
   name: string;
   score: number;
+  levels: number;
   me: boolean;
   friend: boolean;
 }
@@ -18,15 +18,6 @@ interface View {
   total: number;
 }
 
-const ENVS: Array<[string, string]> = [
-  ['overall', 'Overall'],
-  ['factory', 'Meat factory'],
-  ['studio', 'TV studio'],
-  ['boathouse', 'Boathouse'],
-  ['rowing', 'Rowing race'],
-  ['endless', 'Endless'],
-];
-
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -34,12 +25,10 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
   return e;
 }
 
-/** Leaderboard screen: Duos / Players, This week / All time, one environment (or Overall). Reads /api/leaderboard; nothing is ever sent from here. */
+/** Leaderboard: two tabs (Duos, Solo), one all-time top 25 each. Total = sum of the best score per level. Reads /api/leaderboard only. */
 export class LeaderboardUI {
   private readonly root = el('div', 'screen hidden');
   private kind: Kind = 'duo';
-  private range: Range = 'week';
-  private env = 'overall';
   private back: (() => void) | null = null;
   private seq = 0;
 
@@ -71,87 +60,77 @@ export class LeaderboardUI {
 
   private async load(): Promise<void> {
     const my = ++this.seq;
-    const q = new URLSearchParams({ kind: this.kind, range: this.range, env: this.env });
     const id = loadIdentity();
     try {
-      const res = await fetch(`/api/leaderboard?${q}`, { headers: id ? { 'x-dd-token': id.token } : {} });
+      const res = await fetch(`/api/leaderboard?kind=${this.kind}&range=all&env=overall`, { headers: id ? { 'x-dd-token': id.token } : {} });
       if (!res.ok) throw new Error(String(res.status));
       const v = (await res.json()) as View;
       if (my === this.seq) this.render(v, '');
     } catch {
-      if (my === this.seq) this.render(null, 'Could not load the leaderboard. Try again later.');
+      if (my === this.seq) this.render(null, 'Could not load the leaderboard.');
     }
   }
 
   private render(v: View | null, note: string): void {
     const card = el('div', 'card');
-    card.style.maxHeight = '90vh';
-    card.style.overflowY = 'auto';
+    card.style.cssText = 'display:flex;flex-direction:column;max-height:94vh;width:min(560px,94vw);padding:10px 14px;gap:6px;overflow:hidden';
     const head = el('div', 'ctl');
-    const done = el('button', 'primary', 'Back');
-    done.dataset.testid = 'lb-back';
-    done.addEventListener('click', () => {
+    head.style.margin = '0';
+    const back = el('button', '', 'Back');
+    back.dataset.testid = 'lb-back';
+    back.addEventListener('click', () => {
       sfx.click();
       this.close();
     });
-    head.append(done, el('h2', '', 'Leaderboard'));
-    card.append(head);
-    const tabs = (items: Array<[string, string]>, cur: string, id: string, set: (v: string) => void): HTMLElement => {
-      const row = el('div', 'ctl');
-      for (const [val, label] of items) {
-        const b = el('button', val === cur ? 'active' : '', label);
-        b.dataset.testid = `${id}-${val}`;
-        b.addEventListener('click', () => {
-          sfx.click();
-          set(val);
-          this.show();
-        });
-        row.append(b);
-      }
-      return row;
-    };
-    const top = tabs([['duo', 'Duos'], ['player', 'Players'], ['solo', 'Solo']], this.kind, 'lb-kind', (x) => (this.kind = x as Kind));
-    top.append(...tabs([['week', 'This week'], ['all', 'All time']], this.range, 'lb-range', (x) => (this.range = x as Range)).children);
-    card.append(top);
-    const envs = el('div', 'ctl');
-    envs.style.flexWrap = 'wrap';
-    for (const [val, label] of ENVS) {
-      const b = el('button', val === this.env ? 'active' : '', label);
-      b.dataset.testid = `lb-env-${val}`;
+    head.append(back);
+    for (const [k, label] of [['duo', 'Duos'], ['solo', 'Solo']] as Array<[Kind, string]>) {
+      const b = el('button', k === this.kind ? 'active' : '', label);
+      b.dataset.testid = `lb-kind-${k}`;
       b.addEventListener('click', () => {
         sfx.click();
-        this.env = val;
+        this.kind = k;
         this.show();
       });
-      envs.append(b);
+      head.append(b);
     }
-    card.append(envs);
-    const list = el('div', 'lb-list');
-    list.dataset.testid = 'lb-list';
-    list.style.textAlign = 'left';
+    card.append(head);
+    if (this.screens.soloNote) {
+      const n = el('p', 'sub', this.screens.soloNote);
+      n.dataset.testid = 'lb-note';
+      n.style.margin = '0';
+      card.append(n);
+    }
     const row = (e: Entry): HTMLElement => {
       const r = el('div', 'lb-row');
       r.dataset.testid = e.me ? 'lb-row-me' : 'lb-row';
-      r.style.cssText = `display:flex;gap:10px;padding:4px 8px;border-radius:8px;${e.me ? 'background:rgba(255,211,107,0.35);font-weight:700;' : ''}`;
+      r.style.cssText = `display:flex;gap:8px;padding:3px 8px;border-radius:8px;font-size:15px;${e.me ? 'background:rgba(255,211,107,0.35);font-weight:700;' : ''}`;
+      const rank = el('span', '', `#${e.rank}`);
+      rank.style.width = '2.6em';
       const name = el('span', '', e.name + (e.me ? ' (you)' : e.friend ? ' ★' : ''));
-      name.style.flex = '1';
-      r.append(el('span', '', `#${e.rank}`), name, el('span', '', String(e.score)));
-      r.firstElementChild!.setAttribute('style', 'width:3em');
+      name.style.cssText = 'flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+      const lv = el('span', '', `${e.levels} level${e.levels === 1 ? '' : 's'}`);
+      lv.style.opacity = '0.7';
+      const pts = el('span', '', String(e.score));
+      pts.style.cssText = 'min-width:3.5em;text-align:right';
+      r.append(rank, name, lv, pts);
       return r;
     };
+    const list = el('div', 'lb-list');
+    list.dataset.testid = 'lb-list';
+    list.style.cssText = 'flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch';
     if (v && v.entries.length) {
       for (const e of v.entries) list.append(row(e));
-      if (v.me) {
-        list.append(el('div', 'sub', '…'));
-        list.append(row(v.me));
-      }
     } else if (v) {
-      const empty = el('p', 'sub', 'No scores yet. Play online with a friend to get on the board.');
+      const empty = el('p', 'sub', 'Play a level to get on the board.');
       empty.dataset.testid = 'lb-empty';
       list.append(empty);
     } else list.append(el('p', 'sub', note));
     card.append(list);
-    card.append(el('p', 'sub', this.kind === 'solo' ? 'Solo runs are sent by your device and checked for plausibility. You need a name (Play with a friend) to take part.' : 'Only online two-player runs count in Duos and Players. Names are shown without any search.'));
+    if (v?.me) {
+      const mine = row(v.me);
+      mine.style.borderTop = '1px solid rgba(255,255,255,0.3)';
+      card.append(mine);
+    }
     this.root.replaceChildren(card);
     this.root.classList.remove('hidden');
   }
