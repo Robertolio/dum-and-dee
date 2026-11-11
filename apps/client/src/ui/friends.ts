@@ -353,16 +353,21 @@ export class FriendsUI {
     this.scene.paused = true;
     this.social.start();
     const card = el('div', 'card friends');
-    card.append(el('h2', '', 'Friends'));
+    card.append(el('h2', '', 'Invite a Friend'));
     const me = this.social.me;
     const top = el('div', 'me-box');
-    const code = tid(el('div', 'code', me?.code ?? '…'), 'friends-my-code');
-    const name = tid(el('small', '', me?.name ?? loadIdentity()?.name ?? ''), 'friends-me-name');
-    top.append(el('h3', '', 'Invite a friend'), code, name);
+    const code = tid(el('div', 'code small', me?.code ?? '…'), 'friends-my-code');
+    const name = tid(el('div', 'me-name', me?.name ?? loadIdentity()?.name ?? ''), 'friends-me-name');
+    top.append(name, code);
     const share = el('div', 'share');
-    const wa = tid(el('a', 'btn wa big', 'Share via WhatsApp'), 'friends-wa');
-    wa.target = '_blank';
-    wa.rel = 'noopener';
+    const wa = btn('Share', 'friends-share', () => {
+      const text = inviteText(this.social.me?.code ?? '');
+      if (typeof navigator.share === 'function') {
+        void navigator.share({ title: 'Dum & Dee', text }).catch(() => undefined);
+        return;
+      }
+      if (!window.open(wa.dataset.wa, '_blank', 'noopener')) void navigator.clipboard?.writeText(text).catch(() => undefined);
+    }, 'big wa');
     const copy = btn('Copy', 'friends-copy', () => {
       void navigator.clipboard?.writeText(inviteText(this.social.me?.code ?? '')).then(() => {
         copy.textContent = 'Copied';
@@ -371,7 +376,7 @@ export class FriendsUI {
     }, 'big');
     const setWa = (): void => {
       const c = this.social.me?.code ?? '';
-      wa.href = `https://wa.me/?text=${encodeURIComponent(inviteText(c))}`;
+      wa.dataset.wa = `https://wa.me/?text=${encodeURIComponent(inviteText(c))}`;
       code.textContent = c || '…';
       name.textContent = this.social.me?.name ?? name.textContent;
     };
@@ -379,7 +384,6 @@ export class FriendsUI {
     this.offMe?.();
     this.offMe = this.social.on((e) => e.type === 'me' && setWa());
     share.append(wa, copy);
-    if (typeof navigator.share === 'function') share.append(btn('Share…', 'friends-share', () => void navigator.share({ title: 'Dum & Dee', text: inviteText(this.social.me?.code ?? '') }).catch(() => undefined), 'big'));
     top.append(share);
     card.append(top);
 

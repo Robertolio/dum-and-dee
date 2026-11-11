@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { addByCode } from './helpers';
+import { addByCode, twoFriends } from './helpers';
 
 test.use({ baseURL: process.env.E2E_BASE ?? 'http://localhost:4600' });
 
@@ -57,7 +57,7 @@ test.describe('Identity and friends', () => {
     await register(a, 'Rob');
     const codeA = (await a.getByTestId('friends-my-code').textContent())!;
     expect(codeA).toMatch(/^ROB-[2-9A-Z]{3}$/);
-    const href = (await a.getByTestId('friends-wa').getAttribute('href'))!;
+    const href = (await a.getByTestId('friends-share').getAttribute('data-wa'))!;
     expect(decodeURIComponent(href.split('text=')[1]!)).toBe(`Play Dum & Dee with me: ${new URL(a.url()).origin}/?invite=${codeA} — my code is ${codeA}`);
 
     await register(b, 'Mia');
@@ -175,5 +175,67 @@ test.describe('Invite landing', () => {
     await page.getByTestId('btn-play').click();
     await expect(page.getByTestId('onb-invite')).toHaveValue('ROB-7K2');
     await ctx.close();
+  });
+});
+
+test.describe('Friends screen layout', () => {
+  test('one title, big Share + Copy, no system share, name prominent, list reachable and clear of the corner buttons', async ({ browser }) => {
+    const { A, B } = await twoFriends(browser, 'Rob', 'Mia');
+    const page = A.page;
+    await page.addInitScript(() => {
+      (window as any).__shared = [];
+      (navigator as any).share = (d: unknown) => ((window as any).__shared.push(d), Promise.resolve());
+    });
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__dd !== undefined);
+    await page.getByTestId('btn-friend').click();
+    await expect(page.getByTestId('friends-my-code')).toBeVisible();
+    const card = page.locator('#friends .card');
+    await expect(card.locator('h2')).toHaveText('Invite a Friend');
+    await expect(card.locator('h3', { hasText: /^Invite a friend$/i })).toHaveCount(0);
+    await expect(page.getByTestId('friends-share')).toHaveText('Share');
+    await expect(page.getByTestId('friends-copy')).toBeVisible();
+    await page.getByTestId('friends-share').click();
+    const shared = await page.evaluate(() => (window as any).__shared);
+    expect(shared).toHaveLength(1);
+    expect(shared[0].text).toContain('?invite=');
+    expect(shared[0].text).toContain(await page.getByTestId('friends-my-code').innerText());
+    await expect(card).not.toContainText('WhatsApp');
+    const nameSize = await page.getByTestId('friends-me-name').evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    const codeSize = await page.getByTestId('friends-my-code').evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    expect(nameSize).toBeGreaterThan(codeSize);
+    const box = (await card.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(390);
+    const row = page.getByTestId('friend-Mia');
+    await row.scrollIntoViewIfNeeded();
+    await expect(row).toBeVisible();
+    const r = (await row.boundingBox())!;
+    expect(r.y + r.height).toBeLessThanOrEqual(390 - 40);
+    const gear = page.getByTestId('settings-button');
+    const gb = await gear.boundingBox();
+    if (gb) expect(r.x + r.width <= gb.x || gb.x + gb.width <= r.x || r.y + r.height <= gb.y || gb.y + gb.height <= r.y).toBe(true);
+    await page.getByTestId('friends-back').scrollIntoViewIfNeeded();
+    await page.getByTestId('friends-back').click();
+    await expect(page.getByTestId('menu-screen')).toBeVisible();
+    await A.ctx.close();
+    await B.ctx.close();
+  });
+
+  test('without a system share menu, Share opens the WhatsApp link', async ({ browser }) => {
+    const P = await (await import('./helpers')).newPlayer(browser, 'Wal');
+    const page = P.page;
+    await page.addInitScript(() => {
+      (navigator as any).share = undefined;
+      (window as any).__opened = [];
+      window.open = ((u: string) => ((window as any).__opened.push(u), {})) as any;
+    });
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__dd !== undefined);
+    await page.getByTestId('btn-friend').click();
+    await page.getByTestId('friends-share').click();
+    const opened = await page.evaluate(() => (window as any).__opened);
+    expect(opened[0]).toMatch(/^https:\/\/wa\.me\/\?text=/);
+    await P.ctx.close();
   });
 });
